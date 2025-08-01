@@ -1,3 +1,4 @@
+
 // Survey Configuration Constants
 const SURVEY_CONFIG = {
     approachesHeight: 0.8,
@@ -29,6 +30,21 @@ const SURVEY_CONFIG = {
             
             <p>You'll use sliders to shape these curves based on your judgment. No controls are shown here - this is just to demonstrate the visualization.</p>
         `,
+    },
+
+    metalogTestCard: {
+        title: "Metalog Distribution Test",
+        content: `
+            <p>This slide demonstrates the new table-based input system for metalog distributions.</p>
+            
+            <p>Enter time/probability pairs in the table below. The metalog will automatically update as you modify the values.</p>
+        `,
+        showTable: true,
+        defaultData: [
+            { time: "1 year", probability: "25%" },
+            { time: "10 years", probability: "50%" },
+            { time: "50 years", probability: "75%" }
+        ]
     },
 
     approachesTitle: {
@@ -115,9 +131,9 @@ class AlignmentLandscape {
 
         // Step-through state
         this.currentStep = 0;
-        this.totalSteps = 1 + 1 + 1 +
+        this.totalSteps = 1 + 1 + 1 + 1 +
             SURVEY_CONFIG.predefinedApproaches.length +
-            1 + SURVEY_CONFIG.predefinedInterventions.length + 1; // intro + example + approaches title + approaches + interventions title + interventions + review
+            1 + SURVEY_CONFIG.predefinedInterventions.length + 1; // intro + example + metalog test + approaches title + approaches + interventions title + interventions + review
         this.completedSteps = new Set();
         this.hasInteracted = false;
         this.everCompleted = new Set(); // Track items that have been completed at least once
@@ -126,6 +142,7 @@ class AlignmentLandscape {
         this.initializeSurvey();
         this.checkMobileAndShowModal();
         this.setupEventListeners();
+        
     }
 
     init() {
@@ -189,6 +206,14 @@ class AlignmentLandscape {
             .attr("class", "grid")
             .attr("transform", `translate(0,${this.splitY})`)
             .call(xGrid);
+
+        // Add clipping path to constrain curves to chart area
+        this.svg.append("defs")
+            .append("clipPath")
+            .attr("id", "chart-area")
+            .append("rect")
+            .attr("width", this.width)
+            .attr("height", this.splitY);
     }
 
     getLogTimeTicks() {
@@ -255,17 +280,19 @@ class AlignmentLandscape {
         } else if (this.currentStep === 1) {
             return { type: "example", item: SURVEY_CONFIG.exampleCard };
         } else if (this.currentStep === 2) {
+            return { type: "metalogTest", item: SURVEY_CONFIG.metalogTestCard };
+        } else if (this.currentStep === 3) {
             return {
                 type: "approachesTitle",
                 item: SURVEY_CONFIG.approachesTitle,
             };
         } else if (
-            this.currentStep <= 2 + SURVEY_CONFIG.predefinedApproaches.length
+            this.currentStep <= 3 + SURVEY_CONFIG.predefinedApproaches.length
         ) {
-            const approachIndex = this.currentStep - 3;
+            const approachIndex = this.currentStep - 4;
             return { type: "approach", item: this.approaches[approachIndex] };
         } else if (
-            this.currentStep === 3 + SURVEY_CONFIG.predefinedApproaches.length
+            this.currentStep === 4 + SURVEY_CONFIG.predefinedApproaches.length
         ) {
             return {
                 type: "interventionsTitle",
@@ -273,12 +300,12 @@ class AlignmentLandscape {
             };
         } else if (
             this.currentStep ===
-                4 + SURVEY_CONFIG.predefinedApproaches.length +
+                5 + SURVEY_CONFIG.predefinedApproaches.length +
                     SURVEY_CONFIG.predefinedInterventions.length
         ) {
             return { type: "review", item: SURVEY_CONFIG.reviewCard };
         } else {
-            const interventionIndex = this.currentStep - 4 -
+            const interventionIndex = this.currentStep - 5 -
                 SURVEY_CONFIG.predefinedApproaches.length;
             return {
                 type: "intervention",
@@ -307,6 +334,8 @@ class AlignmentLandscape {
             this.createInfoCard(currentItem.item, container);
         } else if (currentItem.type === "example") {
             this.createExampleCard(currentItem.item, container);
+        } else if (currentItem.type === "metalogTest") {
+            this.createMetalogTestCard(currentItem.item, container);
         } else if (currentItem.type === "review") {
             this.createReviewUI(currentItem.item, container);
         } else if (currentItem.type === "approach") {
@@ -826,6 +855,9 @@ class AlignmentLandscape {
         } else if (currentItem.type === "example") {
             // Show example curves without interaction
             this.drawExampleVisualization();
+        } else if (currentItem.type === "metalogTest") {
+            // Show metalog test visualization
+            this.drawMetalogTestVisualization();
         }
         // For intro/title cards, show no curves (cleared above)
     }
@@ -1026,6 +1058,38 @@ class AlignmentLandscape {
         document.getElementById("tooltip").style.display = "none";
     }
 
+    showCoordinateTooltip(event, metalog) {
+        const [mouseX, mouseY] = d3.pointer(event);
+        
+        // Convert mouse position back to data coordinates
+        const normalizedTime = this.xScale.invert(mouseX);
+        const probability = this.yScaleApproaches.invert(mouseY);
+        
+        // Convert to actual time units
+        const timeInYears = this.normalizedToTime(normalizedTime);
+        const timeStr = this.formatTime(timeInYears);
+        
+        const tooltip = document.getElementById("tooltip");
+        tooltip.innerHTML = `
+            <strong>Coordinates:</strong><br/>
+            Time: ${timeStr} (norm: ${normalizedTime.toFixed(3)})<br/>
+            Probability: ${(probability * 100).toFixed(1)}%<br/>
+            <em>Hover to see values along curve</em>
+        `;
+        tooltip.style.left = (event.pageX + 10) + "px";
+        tooltip.style.top = (event.pageY - 10) + "px";
+        tooltip.style.display = "block";
+    }
+
+    formatTime(years) {
+        if (years < 1/365.25) return `${(years * 365.25).toFixed(1)} days`;
+        if (years < 1/12) return `${(years * 365.25).toFixed(0)} days`;
+        if (years < 1) return `${(years * 12).toFixed(1)} months`;
+        if (years < 10) return `${years.toFixed(1)} years`;
+        if (years < 100) return `${years.toFixed(0)} years`;
+        return `${(years/100).toFixed(1)} centuries`;
+    }
+
     highlightIntervention(activeId) {
         this.interventions.forEach((intervention) => {
             const curve = this.svg.select(
@@ -1142,10 +1206,531 @@ class AlignmentLandscape {
     dismissMobileModal() {
         document.getElementById("mobile-modal").style.display = "none";
     }
+
+
+    // Metalog distribution utilities
+    fitMetalog(dataPoints, numTerms = 3) {
+        console.log("🧮 Fitting metalog with", dataPoints.length, "points and", numTerms, "terms");
+        
+        // dataPoints should be array of {x: timeValue, y: cdfProbability}
+        // Sort points by CDF probability
+        const sortedPoints = [...dataPoints].sort((a, b) => a.y - b.y);
+        
+        // Validate monotonicity
+        for (let i = 1; i < sortedPoints.length; i++) {
+            if (sortedPoints[i].y <= sortedPoints[i-1].y) {
+                throw new Error("CDF probabilities must be strictly increasing");
+            }
+            if (sortedPoints[i].x <= sortedPoints[i-1].x) {
+                throw new Error("Time values must be strictly increasing");
+            }
+        }
+        
+        // Convert to normalized space (we'll work in log time)
+        const normalizedPoints = sortedPoints.map(point => ({
+            x: this.timeToNormalized(point.x),
+            y: point.y
+        }));
+
+        console.log("📊 Normalized points:", normalizedPoints);
+
+        // Build the Y matrix using metalog basis functions
+        const n = normalizedPoints.length;
+        const k = Math.min(numTerms, n); // Can't have more terms than data points
+        
+        const Y = [];
+        const z = [];
+        
+        for (let i = 0; i < n; i++) {
+            const y = normalizedPoints[i].y;
+            const x = normalizedPoints[i].x;
+            
+            // Avoid y = 0 or y = 1 exactly (causes ln issues)
+            const safeY = Math.max(0.001, Math.min(0.999, y));
+            
+            const row = [];
+            // g1(y) = 1
+            row.push(1);
+            
+            // g2(y) = ln(y/(1-y))
+            if (k >= 2) {
+                row.push(Math.log(safeY / (1 - safeY)));
+            }
+            
+            // g3(y) = (y - 0.5) * ln(y/(1-y))
+            if (k >= 3) {
+                row.push((safeY - 0.5) * Math.log(safeY / (1 - safeY)));
+            }
+            
+            // g4(y) = y - 0.5
+            if (k >= 4) {
+                row.push(safeY - 0.5);
+            }
+            
+            Y.push(row);
+            z.push(x);
+        }
+        
+        console.log("🔢 Y matrix:", Y);
+        console.log("🔢 z vector:", z);
+        
+        try {
+            // Use math.js to solve the linear system
+            const YMatrix = math.matrix(Y);
+            const zVector = math.matrix(z);
+            
+            // If we have exactly k points, we can solve directly
+            if (n === k) {
+                const coefficients = math.multiply(math.inv(YMatrix), zVector);
+                console.log("✅ Direct solve successful");
+                return {
+                    coefficients: coefficients.toArray(),
+                    numTerms: k,
+                    dataPoints: normalizedPoints
+                };
+            } else {
+                // Use least squares: a = (Y^T Y)^(-1) Y^T z
+                const YT = math.transpose(YMatrix);
+                const YTY = math.multiply(YT, YMatrix);
+                const YTz = math.multiply(YT, zVector);
+                const coefficients = math.multiply(math.inv(YTY), YTz);
+                
+                console.log("✅ Least squares solve successful");
+                return {
+                    coefficients: coefficients.toArray(),
+                    numTerms: k,
+                    dataPoints: normalizedPoints
+                };
+            }
+        } catch (error) {
+            console.error("❌ Metalog fitting failed:", error);
+            throw new Error("Failed to fit metalog distribution: " + error.message);
+        }
+    }
+
+    evaluateMetalog(metalog, cdfProbability) {
+        // Evaluate the metalog quantile function at given CDF probability
+        const y = Math.max(0.001, Math.min(0.999, cdfProbability));
+        const coefficients = metalog.coefficients;
+        const k = metalog.numTerms;
+        
+        let result = 0;
+        
+        // g1(y) = 1
+        result += coefficients[0];
+        
+        // g2(y) = ln(y/(1-y))
+        if (k >= 2) {
+            result += coefficients[1] * Math.log(y / (1 - y));
+        }
+        
+        // g3(y) = (y - 0.5) * ln(y/(1-y))
+        if (k >= 3) {
+            result += coefficients[2] * (y - 0.5) * Math.log(y / (1 - y));
+        }
+        
+        // g4(y) = y - 0.5
+        if (k >= 4) {
+            result += coefficients[3] * (y - 0.5);
+        }
+        
+        return result; // This is in normalized time space
+    }
+
+    timeToNormalized(timeInYears) {
+        const oneMonthInYears = 1 / 12;
+        const oneCenturyInYears = 100;
+        const logMin = Math.log10(oneMonthInYears);
+        const logMax = Math.log10(oneCenturyInYears);
+        const logValue = Math.log10(timeInYears);
+        return (logValue - logMin) / (logMax - logMin);
+    }
+
+    normalizedToTime(normalizedValue) {
+        const oneMonthInYears = 1 / 12;
+        const oneCenturyInYears = 100;
+        const logMin = Math.log10(oneMonthInYears);
+        const logMax = Math.log10(oneCenturyInYears);
+        const logValue = logMin + normalizedValue * (logMax - logMin);
+        return Math.pow(10, logValue);
+    }
+
+    createMetalogTestCard(card, container) {
+        container.innerHTML = `
+            <div class="info-card">
+                <h3>${card.title}</h3>
+                ${card.content}
+                ${card.showTable ? this.createMetalogDataTable(card.defaultData) : ''}
+            </div>
+        `;
+        
+        // If we have a table, set up the event listeners
+        if (card.showTable) {
+            this.setupMetalogTableEvents();
+        }
+    }
+
+    createMetalogDataTable(defaultData) {
+        return `
+            <div class="metalog-table-container">
+                <h4>Data Points</h4>
+                <table class="metalog-data-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Probability</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="metalog-table-body">
+                        ${defaultData.map((row, index) => `
+                            <tr>
+                                <td><input type="text" class="table-input time-input" value="${row.time}" data-row="${index}"></td>
+                                <td><input type="text" class="table-input prob-input" value="${row.probability}" data-row="${index}"></td>
+                                <td><button class="remove-btn" onclick="alignmentLandscape.removeMetalogRow(${index})">Remove</button></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <button class="button" onclick="alignmentLandscape.addMetalogRow()">Add Row</button>
+            </div>
+        `;
+    }
+
+    setupMetalogTableEvents() {
+        // Set up event listeners for input changes
+        setTimeout(() => {
+            const inputs = document.querySelectorAll('.table-input');
+            inputs.forEach(input => {
+                input.addEventListener('input', () => this.updateMetalogFromTable());
+                input.addEventListener('blur', () => this.updateMetalogFromTable());
+            });
+            // Initial metalog rendering
+            this.updateMetalogFromTable();
+        }, 100);
+    }
+
+    parseTimeInput(timeStr) {
+        // Simple parsing for now - just extract numbers and convert to years
+        const cleaned = timeStr.toLowerCase().trim();
+        const number = parseFloat(cleaned);
+        
+        if (isNaN(number) || number <= 0) return null;
+        
+        if (cleaned.includes('day')) return number / 365.25;
+        if (cleaned.includes('week')) return number / 52.18;
+        if (cleaned.includes('month')) return number / 12;
+        if (cleaned.includes('year')) return number;
+        if (cleaned.includes('decade')) return number * 10;
+        if (cleaned.includes('century')) return number * 100;
+        
+        // Default to years if no unit specified
+        return number;
+    }
+
+    parseProbabilityInput(probStr) {
+        // Parse probability - handle both decimal (0.75) and percentage (75%)
+        const cleaned = probStr.trim();
+        let number = parseFloat(cleaned);
+        
+        if (isNaN(number)) return null;
+        
+        // If it contains %, treat as percentage
+        if (cleaned.includes('%')) {
+            number = number / 100;
+        }
+        
+        // Clamp to valid probability range
+        return Math.max(0, Math.min(1, number));
+    }
+
+    getMetalogTableData() {
+        const inputs = document.querySelectorAll('#metalog-table-body tr');
+        const data = [];
+        
+        inputs.forEach(row => {
+            const timeInput = row.querySelector('.time-input');
+            const probInput = row.querySelector('.prob-input');
+            
+            if (timeInput && probInput) {
+                const timeYears = this.parseTimeInput(timeInput.value);
+                const probability = this.parseProbabilityInput(probInput.value);
+                
+                if (timeYears !== null && probability !== null) {
+                    data.push({
+                        x: timeYears,
+                        y: probability
+                    });
+                }
+            }
+        });
+        
+        return data.sort((a, b) => a.y - b.y); // Sort by probability for metalog fitting
+    }
+
+    validateMetalogData(data) {
+        // Check we have enough points
+        if (data.length < 2) {
+            return { valid: false, error: "Need at least 2 data points" };
+        }
+        
+        // Check probabilities are strictly increasing
+        for (let i = 1; i < data.length; i++) {
+            if (data[i].y <= data[i-1].y) {
+                return { valid: false, error: `Probability must increase: ${(data[i-1].y*100).toFixed(1)}% → ${(data[i].y*100).toFixed(1)}%` };
+            }
+        }
+        
+        // Check times are reasonable (positive and increasing would be nice but not required for metalog)
+        for (let i = 0; i < data.length; i++) {
+            if (data[i].x <= 0) {
+                return { valid: false, error: "All times must be positive" };
+            }
+        }
+        
+        return { valid: true };
+    }
+
+    updateMetalogFromTable() {
+        const data = this.getMetalogTableData();
+        const validation = this.validateMetalogData(data);
+        
+        // Clear existing curves
+        this.svg.selectAll(".s-curve").remove();
+        
+        if (!validation.valid) {
+            console.log("⚠️ Validation failed:", validation.error);
+            this.showMetalogError(validation.error);
+            return;
+        }
+        
+        try {
+            // Use k=n (exact fit through all points) as default, fall back if infeasible
+            let metalog;
+            const n = data.length;
+            const candidateK = [n, Math.min(n-1, 4), 3, 2]; // Try n first, then fewer terms
+            
+            for (const k of candidateK) {
+                if (k < 2) continue; // Minimum 2 terms
+                
+                try {
+                    metalog = this.fitMetalog(data, k);
+                    
+                    // Check feasibility using metalog-specific constraints
+                    if (this.checkMetalogFeasibility(metalog)) {
+                        console.log(`✅ Metalog fitted successfully with k=${k} terms (n=${n} data points)`);
+                        break;
+                    } else {
+                        console.log(`⚠️ k=${k} terms violated feasibility constraints`);
+                    }
+                } catch (e) {
+                    console.log(`⚠️ k=${k} failed: ${e.message}`);
+                }
+                
+                if (k === 2) {
+                    throw new Error("Even k=2 is infeasible - data may be problematic");
+                }
+            }
+            
+            this.drawMetalogCurve(metalog, "Table-based Approach", 0);
+            this.hideMetalogError();
+            
+        } catch (error) {
+            console.error("❌ Failed to fit metalog:", error);
+            this.showMetalogError("Metalog fitting failed - data may be too difficult to fit");
+        }
+    }
+
+    showMetalogError(message) {
+        let errorDiv = document.getElementById('metalog-error');
+        if (!errorDiv) {
+            const container = document.querySelector('.metalog-table-container');
+            errorDiv = document.createElement('div');
+            errorDiv.id = 'metalog-error';
+            errorDiv.style.cssText = 'color: #d32f2f; background: #ffebee; padding: 8px; border-radius: 4px; margin: 10px 0; font-size: 14px;';
+            container.appendChild(errorDiv);
+        }
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+
+    hideMetalogError() {
+        const errorDiv = document.getElementById('metalog-error');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+    }
+
+    checkMetalogFeasibility(metalog) {
+        const coefficients = metalog.coefficients;
+        const k = metalog.numTerms;
+        
+        // For k=2: a₂ > 0
+        if (k >= 2 && coefficients[1] <= 0) {
+            console.log("Feasibility failed: a₂ ≤ 0");
+            return false;
+        }
+        
+        // For k=3: a₂ > 0 and |a₃|/a₂ < 1.66711
+        if (k >= 3) {
+            const ratio = Math.abs(coefficients[2]) / coefficients[1];
+            if (ratio >= 1.66711) {
+                console.log(`Feasibility failed: |a₃|/a₂ = ${ratio.toFixed(4)} ≥ 1.66711`);
+                return false;
+            }
+        }
+        
+        // Additional check: sample the quantile function to ensure monotonicity
+        return this.isQuantileFunctionMonotonic(metalog);
+    }
+
+    isQuantileFunctionMonotonic(metalog) {
+        // Check that the quantile function is monotonically increasing
+        const testPoints = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99];
+        let lastValue = -Infinity;
+        
+        for (const y of testPoints) {
+            try {
+                const x = this.evaluateMetalog(metalog, y);
+                if (!isFinite(x) || x <= lastValue) {
+                    console.log(`Monotonicity failed at y=${y}: x=${x}, lastX=${lastValue}`);
+                    return false;
+                }
+                lastValue = x;
+            } catch (e) {
+                console.log(`Evaluation failed at y=${y}: ${e.message}`);
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    addMetalogRow() {
+        const tbody = document.getElementById('metalog-table-body');
+        const rowCount = tbody.children.length;
+        
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td><input type="text" class="table-input time-input" value="1 year" data-row="${rowCount}"></td>
+            <td><input type="text" class="table-input prob-input" value="50%" data-row="${rowCount}"></td>
+            <td><button class="remove-btn" onclick="alignmentLandscape.removeMetalogRow(${rowCount})">Remove</button></td>
+        `;
+        
+        tbody.appendChild(newRow);
+        
+        // Set up event listeners for the new inputs
+        const newInputs = newRow.querySelectorAll('.table-input');
+        newInputs.forEach(input => {
+            input.addEventListener('input', () => this.updateMetalogFromTable());
+            input.addEventListener('blur', () => this.updateMetalogFromTable());
+        });
+        
+        this.updateMetalogFromTable();
+    }
+
+    removeMetalogRow(index) {
+        const tbody = document.getElementById('metalog-table-body');
+        const rows = tbody.children;
+        
+        if (rows.length > 2) { // Keep at least 2 rows
+            rows[index].remove();
+            this.updateMetalogFromTable();
+        }
+    }
+
+    drawMetalogTestVisualization() {
+        console.log("🎯 Drawing metalog test visualization...");
+        
+        // Test with some example data points: (time in years, CDF probability)
+        const testData = [
+            { x: 1, y: 0.25 },    // 25% chance by 1 year
+            { x: 10, y: 0.50 },   // 50% chance by 10 years  
+            { x: 50, y: 0.75 }    // 75% chance by 50 years
+        ];
+        
+        try {
+            const metalog = this.fitMetalog(testData, 3);
+            console.log("✅ Metalog fitted successfully!");
+            console.log("📊 Coefficients:", metalog.coefficients.map(c => c.toFixed(4)));
+            
+            // Verify it passes through our original points
+            console.log("\n🎯 Verification (should match original data):");
+            testData.forEach(point => {
+                const normalizedTime = this.evaluateMetalog(metalog, point.y);
+                const timeInYears = this.normalizedToTime(normalizedTime);
+                const error = Math.abs(timeInYears - point.x);
+                const status = error < 0.1 ? "✅" : "❌";
+                console.log(`  ${status} Expected: ${point.x} years, Got: ${timeInYears.toFixed(3)} years (error: ${error.toFixed(3)})`);
+            });
+            
+            // Draw the metalog curve
+            this.drawMetalogCurve(metalog, "Test Approach", 0);
+            
+        } catch (error) {
+            console.error("❌ Metalog test failed:", error);
+            
+            // Fallback to regular S-curve
+            const fallbackApproach = {
+                id: "fallback-approach",
+                name: "Test Approach (fallback)",
+                inflection: 0.6,
+                steepness: 3.0,
+                maxProb: 0.8,
+            };
+            this.drawSCurve(fallbackApproach, 0, false);
+        }
+    }
+
+    drawMetalogCurve(metalog, name, index) {
+        const numPoints = 200;
+        const data = [];
+
+        // Plot the full metalog curve without restrictions
+        for (let i = 0; i <= numPoints; i++) {
+            const cdfProb = 0.001 + (0.999 - 0.001) * (i / numPoints);
+            const normalizedTime = this.evaluateMetalog(metalog, cdfProb);
+            
+            // Include all points - let the curve extend beyond [0,1] naturally
+            data.push({ x: normalizedTime, y: cdfProb });
+        }
+
+        const line = d3.line()
+            .x((d) => this.xScale(d.x))
+            .y((d) => this.yScaleApproaches(d.y))
+            .curve(d3.curveMonotoneX);
+
+        const curve = this.svg.append("path")
+            .datum(data)
+            .attr("class", "s-curve")
+            .attr("d", line)
+            .attr("clip-path", "url(#chart-area)")
+            .style("stroke", this.getColor(index))
+            .on("mouseover", (event, d) => {
+                this.showTooltip(event, name);
+            })
+            .on("mousemove", (event) => {
+                this.showCoordinateTooltip(event, metalog);
+            })
+            .on("mouseout", () => {
+                this.hideTooltip();
+            });
+
+        // Add label at the end of the curve
+        const finalPoint = data[data.length - 1];
+        this.svg.append("text")
+            .attr("class", "approach-label")
+            .attr("x", this.xScale(finalPoint.x) + 5)
+            .attr("y", this.yScaleApproaches(finalPoint.y))
+            .attr("dy", "0.35em")
+            .style("font-size", `${this.textSize}px`)
+            .style("fill", this.getColor(index))
+            .text(name);
+    }
 }
 
 let alignmentLandscape;
 
-document.addEventListener("DOMContentLoaded", function () {
+window.addEventListener("load", function () {
     alignmentLandscape = new AlignmentLandscape();
 });

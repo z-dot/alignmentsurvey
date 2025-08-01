@@ -410,6 +410,47 @@
             text-decoration: underline;
         }
 
+        .metalog-table-container {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+
+        .metalog-data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+
+        .metalog-data-table th {
+            background-color: #2A623D;
+            color: white;
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .metalog-data-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .table-input {
+            width: 100%;
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+
+        .table-input:focus {
+            outline: none;
+            border-color: #2A623D;
+            box-shadow: 0 0 3px rgba(42, 98, 61, 0.3);
+        }
+
         h1 {
             text-align: center;
         }
@@ -500,6 +541,7 @@
     </div>
     
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="alignment_landscape.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@11.11.0/lib/browser/math.min.js"></script>
+    <script defer src="alignment_landscape.js"></script>
 </body>
 </html>
