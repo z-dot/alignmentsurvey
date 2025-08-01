@@ -7,7 +7,7 @@ const SURVEY_CONFIG = {
     introCard: {
         title: "Welcome to the AI Alignment Difficulty Survey",
         content: `
-            <p>This survey assesses expert opinions on: </p>
+            <p>This survey assesses opinions on: </p>
             <ol>
                 <li> the likelihood that <strong>various alignment approaches succeed within a certain amount of time</strong>, and </li>
                 <li> the effectiveness of various <strong>governance interventions in buying time</strong> for alignment. </li>
@@ -27,7 +27,7 @@ const SURVEY_CONFIG = {
             
             <p><strong>"Complete export controls"</strong> - The distribution shows the amount of time you might 'win' by enacting this intervention.</p>
             
-            <p>You'll use sliders to shape these curves based on your expert judgment. No controls are shown here - this is just to demonstrate the visualization.</p>
+            <p>You'll use sliders to shape these curves based on your judgment. No controls are shown here - this is just to demonstrate the visualization.</p>
         `,
     },
 
@@ -52,12 +52,9 @@ const SURVEY_CONFIG = {
     reviewCard: {
         title: "Review Your Responses",
         content: `
-            <p>Here are all your responses visualized together:</p>
-            <ul>
-                <li><strong>S-curves above:</strong> Alignment approaches (success probability vs. research time)</li>
-                <li><strong>Distributions below:</strong> Time-buying interventions (implementation timing)</li>
-            </ul>
-            <p>You can click on any approach or intervention name below to go back and adjust your responses.</p>
+            <p>Here are all your responses visualized together.</p>
+
+            <p>You can click on any approach or intervention name below to go back and adjust your responses, or click 'Complete Survey' to finish.</p>
         `,
     },
 
@@ -428,14 +425,14 @@ class AlignmentLandscape {
                 
                 <div class="review-lists">
                     <div class="review-section">
-                        <h4>Alignment Approaches:</h4>
+                        <h4>Approaches:</h4>
                         <ul class="review-list">
                             ${approachesList}
                         </ul>
                     </div>
                     
                     <div class="review-section">
-                        <h4>Time-buying Interventions:</h4>
+                        <h4>Interventions:</h4>
                         <ul class="review-list">
                             ${interventionsList}
                         </ul>
