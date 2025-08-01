@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDF Builder</title>
+    <style>
+        @font-face {
+            font-family: 'et-book';
+            src: url('https://edwardtufte.github.io/et-book/et-book/et-book-roman-line-figures/et-book-roman-line-figures.woff') format('woff');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        body {
+            font-family: 'et-book', 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #FFFFF8;
+            color: #111;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #FFFFF8;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .chart-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .axis text {
+            font-size: 12px;
+            fill: #666;
+        }
+        
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #666;
+            shape-rendering: crispEdges;
+        }
+        
+        .cdf-line {
+            fill: none;
+            stroke: #2A623D;
+            stroke-width: 2;
+        }
+        
+        .grid line {
+            stroke: #e0e0e0;
+            stroke-dasharray: 2,2;
+        }
+        
+        .grid path {
+            stroke-width: 0;
+        }
+        
+        .controls {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        
+        .control-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .control-group {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .control-group label {
+            min-width: 200px;
+            font-weight: 500;
+        }
+        
+        .control-group input[type="range"] {
+            flex: 1;
+            margin: 0 10px;
+        }
+        
+        .control-group span {
+            min-width: 80px;
+            font-weight: bold;
+            color: #2A623D;
+        }
+        
+        .toggle-section {
+            margin: 15px 0;
+        }
+        
+        .toggle-section label {
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .toggle-section button {
+            margin-left: 20px;
+            padding: 8px 16px;
+            background-color: #2A623D;
+            color: #FFFFF8;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            min-width: 120px;
+        }
+        
+        .toggle-section button:hover {
+            background-color: #1f4d30;
+        }
+        
+        .distribution {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .distribution-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .weight-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+        
+        .weight-control input[type="range"] {
+            width: 80px;
+        }
+        
+        .weight-control span {
+            min-width: 35px;
+            font-weight: bold;
+            color: #2A623D;
+        }
+        
+        .distribution-title {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .remove-btn {
+            padding: 4px 8px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+        }
+        
+        .remove-btn:hover {
+            background-color: #d32f2f;
+        }
+        
+        .quartile-line {
+            stroke: #666;
+            stroke-dasharray: 3,3;
+            stroke-width: 1;
+        }
+        
+        .quartile-summary {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .quartile-summary h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        
+        .quartile-item {
+            font-weight: 500;
+            text-align: center;
+        }
+        
+        .quartile-label {
+            color: #666;
+        }
+        
+        .quartile-value {
+            color: #2A623D;
+            font-weight: bold;
+        }
+        
+        .slider-row {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+            align-items: center;
+        }
+        
+        .slider-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .slider-group label {
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            color: #666;
+            min-width: auto;
+        }
+        
+        .slider-group input[type="range"] {
+            width: 100%;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chart-container">
+            <div id="chart"></div>
+            <div id="quartile-summary" class="quartile-summary">
+                <!-- Quartile summary will be populated here -->
+            </div>
+        </div>
+        <div class="controls">
+            <div class="control-section">
+                
+                <div class="toggle-section">
+                    <label>
+                        <input type="checkbox" id="smoothToggle" checked> Use smooth curve
+                    </label>
+                    
+                    <div class="control-group" style="display: inline-flex; margin-left: 20px; align-items: center;">
+                        <label for="maxProbability" style="min-width: auto; margin-right: 10px;">Max probability:</label>
+                        <input type="range" id="maxProbability" min="0" max="1" step="0.01" value="1" style="width: 150px;">
+                        <span id="maxProbability-value" style="min-width: 50px; margin-left: 10px;">100%</span>
+                    </div>
+                    
+                    <button id="addDistribution">Add Distribution</button>
+                    <button id="saveConfig">Save to Clipboard</button>
+                </div>
+                
+                <div id="distributions-container">
+                    <!-- Distributions will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

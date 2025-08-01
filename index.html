@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Alignment Landscape</title>
+    <style>
+        @font-face {
+            font-family: 'et-book';
+            src: url('https://edwardtufte.github.io/et-book/et-book/et-book-roman-line-figures/et-book-roman-line-figures.woff') format('woff');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        @font-face {
+            font-family: 'et-book';
+            src: url('https://edwardtufte.github.io/et-book/et-book/et-book-bold-line-figures/et-book-bold-line-figures.woff') format('woff');
+            font-weight: bold;
+            font-style: normal;
+        }
+
+        body {
+            font-family: 'et-book', 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+            font-size: 1rem;
+            margin: 0;
+            padding: 20px;
+            background-color: #FFFFF8;
+            color: #111;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: #FFFFF8;
+            padding: 20px;
+        }
+        
+        .main-content {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+        
+        .chart-container {
+            flex: 1;
+            min-width: 600px;
+            text-align: center;
+        }
+        
+        .controls {
+            flex: 0 0 400px;
+            min-width: 400px;
+        }
+        
+        /* Stack vertically on smaller screens */
+        @media (max-width: 1200px) {
+            .container {
+                max-width: 900px;
+            }
+            
+            .main-content {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .controls {
+                flex: none;
+                min-width: unset;
+                width: 100%;
+            }
+            
+            .chart-container {
+                min-width: unset;
+                width: 100%;
+            }
+        }
+        
+        .axis text {
+            font-family: 'et-book', 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+            font-size: 12px;
+            fill: #666;
+        }
+        
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #666;
+            shape-rendering: crispEdges;
+        }
+        
+        .grid line {
+            stroke: #e0e0e0;
+            stroke-dasharray: 2,2;
+        }
+        
+        .grid path {
+            stroke-width: 0;
+        }
+        
+        .s-curve {
+            fill: none;
+            stroke: #2A623D;
+            stroke-width: 2;
+            opacity: 0.8;
+        }
+        
+        .normal-curve {
+            fill: #666;
+            opacity: 0.3;
+            stroke: #666;
+            stroke-width: 1;
+        }
+        
+        .controls {
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .control-section {
+            margin: 20px 0;
+        }
+        
+        .control-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        
+        .slider-group {
+            margin: 20px 0;
+        }
+        
+        .slider-group label {
+            display: inline-block;
+            font-weight: 500;
+            color: #333;
+            font-size: 0.9em;
+        }
+        
+        .slider-group input[type="range"] {
+            width: 100%;
+            margin: 8px 0;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #ddd;
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #2A623D;
+            cursor: pointer;
+        }
+        
+        .slider-group input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #2A623D;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .slider-value {
+            float: right;
+            font-weight: bold;
+            color: #2A623D;
+            font-size: 0.9em;
+        }
+        
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .context-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 1em;
+            margin-top: 15px;
+        }
+        
+        .context-table th {
+            background-color: #f9f9f9;
+            color: #333;
+            padding: 6px 4px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            border: 1px solid #ddd;
+        }
+        
+        .context-table td {
+            padding: 6px 4px;
+            text-align: center;
+            background-color: white;
+            border: 1px solid #ddd;
+            font-weight: 500;
+            color: #2A623D;
+        }
+        
+        .button {
+            padding: 8px 16px;
+            background-color: #2A623D;
+            color: #FFFFF8;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            margin: 5px;
+        }
+        
+        .button:hover {
+            background-color: #1f4d30;
+        }
+        
+        .remove-btn {
+            padding: 4px 8px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+        }
+        
+        .remove-btn:hover {
+            background-color: #d32f2f;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .tooltip-trigger {
+            cursor: help;
+            font-size: 14px;
+            color: #2A623D;
+            margin-left: 5px;
+            user-select: none;
+        }
+        
+        .tooltip-trigger:hover {
+            color: #1f4d30;
+        }
+        
+        .progress-section {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: #2A623D;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .current-item {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #2A623D;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        
+        .navigation-controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .survey-complete {
+            text-align: center;
+            padding: 20px;
+            background-color: #e8f5e8;
+            border-radius: 8px;
+            border: 2px solid #2A623D;
+        }
+        
+        .item-description {
+            color: #666;
+            font-style: italic;
+            margin-bottom: 15px;
+        }
+        
+        .current-item h4 {
+            margin-top: 0;
+            color: #2A623D;
+        }
+        
+        .info-card {
+            text-align: left;
+        }
+        
+        .info-card h3 {
+            color: #2A623D;
+            margin-top: 0;
+            text-align: center;
+        }
+        
+        .info-card h4 {
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .info-card ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .info-card li {
+            margin: 8px 0;
+        }
+        
+        .next-button-container {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .next-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        
+        .next-button-container:hover .next-tooltip {
+            opacity: 1;
+        }
+        
+        .next-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: rgba(0, 0, 0, 0.8);
+        }
+        
+        .review-lists {
+            display: flex;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        
+        .review-section {
+            flex: 1;
+        }
+        
+        .review-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .review-list li {
+            margin: 5px 0;
+        }
+        
+        .review-list a {
+            color: #2A623D;
+            text-decoration: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: block;
+            transition: background-color 0.2s;
+        }
+        
+        .review-list a:hover {
+            background-color: #f0f0f0;
+            text-decoration: underline;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .mobile-modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .mobile-modal-content {
+            background-color: #FFFFF8;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 400px;
+            margin: 20px;
+            text-align: center;
+            border: 2px solid #2A623D;
+        }
+
+        .mobile-modal-content h3 {
+            color: #2A623D;
+            margin-top: 0;
+        }
+
+        .mobile-modal-content p {
+            margin: 15px 0;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Futures alignment difficulty survey</h1>
+        <div class="main-content">
+            <div class="chart-container">
+                <div id="chart"></div>
+            </div>
+            
+            <div class="controls">
+            <div id="progress-indicator" class="progress-section">
+                <p>Step <span id="current-step">1</span> of <span id="total-steps">7</span></p>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+            </div>
+            
+            <div id="current-item-container" class="current-item">
+                <!-- Current approach or intervention will be displayed here -->
+            </div>
+            
+            <div class="navigation-controls">
+                <button class="button" id="prevStep" disabled>Previous</button>
+                <div class="next-button-container">
+                    <button class="button" id="nextStep">Next</button>
+                    <div class="next-tooltip" id="nextTooltip" style="display: none;">
+                        Move one of the sliders to proceed
+                    </div>
+                </div>
+            </div>
+            
+            <div id="survey-complete" class="survey-complete" style="display: none;">
+                <h3>Survey Complete!</h3>
+                <p>Thank you for completing the AI Alignment Difficulty Survey.</p>
+                <button class="button" id="copyToClipboard">Copy Survey Data</button>
+            </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tooltip" id="tooltip" style="display: none;"></div>
+    
+    <!-- Mobile warning modal -->
+    <div id="mobile-modal" class="mobile-modal" style="display: none;">
+        <div class="mobile-modal-content">
+            <h3>Best Viewed on Desktop</h3>
+            <p>This survey is optimized for desktop browsers. For the best experience with the interactive visualizations and controls, please use a desktop or laptop computer.</p>
+            <p>You can continue on mobile, but some features may be limited.</p>
+            <button class="button" onclick="alignmentLandscape.dismissMobileModal()">Continue Anyway</button>
+        </div>
+    </div>
+    
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="alignment_landscape.js"></script>
+</body>
+</html>
