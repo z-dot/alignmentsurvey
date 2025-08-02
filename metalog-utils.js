@@ -4,8 +4,8 @@
 class MetalogUtils {
     constructor() {
         // Time scale configuration
-        this.minTimeYears = 1/12; // 1 month minimum
-        this.maxTimeYears = 100;  // 1 century maximum
+        this.minTimeYears = 1/365.25; // 1 day minimum
+        this.maxTimeYears = 100;      // 1 century maximum
     }
 
     // Time conversion utilities
@@ -30,12 +30,13 @@ class MetalogUtils {
         
         if (isNaN(number) || number <= 0) return null;
         
+        // Handle all plural and singular forms
         if (cleaned.includes('day')) return number / 365.25;
         if (cleaned.includes('week')) return number / 52.18;
         if (cleaned.includes('month')) return number / 12;
         if (cleaned.includes('year')) return number;
         if (cleaned.includes('decade')) return number * 10;
-        if (cleaned.includes('century')) return number * 100;
+        if (cleaned.includes('centur')) return number * 100; // covers "century" and "centuries"
         
         // Default to years if no unit specified
         return number;
@@ -58,12 +59,37 @@ class MetalogUtils {
 
     // Time formatting for display
     formatTime(years) {
-        if (years < 1/365.25) return `${(years * 365.25).toFixed(1)} days`;
-        if (years < 1/12) return `${(years * 365.25).toFixed(0)} days`;
-        if (years < 1) return `${(years * 12).toFixed(1)} months`;
-        if (years < 10) return `${years.toFixed(1)} years`;
-        if (years < 100) return `${years.toFixed(0)} years`;
-        return `${(years/100).toFixed(1)} centuries`;
+        // Handle very small values
+        if (years < 1/365.25) {
+            const days = years * 365.25;
+            return days === 1 ? "1 day" : `${days.toFixed(1)} days`;
+        }
+        
+        // Less than 1 month - show in days
+        if (years < 1/12) {
+            const days = Math.round(years * 365.25);
+            return days === 1 ? "1 day" : `${days} days`;
+        }
+        
+        // Less than 1 year - show in months (but not exactly 1 year)
+        if (years < 0.99) {
+            const months = years * 12;
+            return months === 1 ? "1 month" : `${months.toFixed(1)} months`;
+        }
+        
+        // Less than 10 years - show with one decimal
+        if (years < 10) {
+            return years === 1 ? "1 year" : `${years.toFixed(1)} years`;
+        }
+        
+        // Less than 100 years - show as whole numbers
+        if (years < 100) {
+            return `${years.toFixed(0)} years`;
+        }
+        
+        // 100+ years - show in centuries
+        const centuries = years / 100;
+        return centuries === 1 ? "1 century" : `${centuries.toFixed(1)} centuries`;
     }
 
     // Data validation

@@ -224,6 +224,16 @@
             background-color: #1f4d30;
         }
         
+        .button:disabled {
+            background-color: #ccc;
+            color: #999;
+            cursor: not-allowed;
+        }
+        
+        .button:disabled:hover {
+            background-color: #ccc;
+        }
+        
         .remove-btn {
             padding: 4px 8px;
             background-color: #f44336;
@@ -437,18 +447,48 @@
             border-bottom: 1px solid #ddd;
         }
 
-        .table-input {
-            width: 100%;
-            padding: 4px 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+        .time-cell, .prob-cell {
+            padding: 8px 12px;
+            border: none;
+            outline: none;
+            background: transparent;
             font-family: inherit;
+            cursor: text;
         }
 
-        .table-input:focus {
-            outline: none;
-            border-color: #2A623D;
-            box-shadow: 0 0 3px rgba(42, 98, 61, 0.3);
+        .time-cell:focus, .prob-cell:focus {
+            background-color: #f9f9f9;
+            border-radius: 3px;
+        }
+
+        .time-cell:hover, .prob-cell:hover {
+            background-color: #fafafa;
+            border-radius: 3px;
+        }
+
+        .remove-btn {
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            border-radius: 3px;
+            width: 24px;
+            height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .remove-btn:hover {
+            background-color: #ffebee;
+            color: #d32f2f;
+        }
+
+        .remove-btn:disabled {
+            color: #ccc;
+            cursor: not-allowed;
         }
 
         h1 {
@@ -494,6 +534,11 @@
         <h1>AI Futures alignment difficulty survey</h1>
         <div class="main-content">
             <div class="chart-container">
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <button class="button" id="yAxisToggle" style="font-size: 12px; padding: 4px 8px;">
+                        Transform Y-axis for Small Probabilities
+                    </button>
+                </div>
                 <div id="chart"></div>
             </div>
             
@@ -536,7 +581,7 @@
             <h3>Best Viewed on Desktop</h3>
             <p>This survey is optimized for desktop browsers. For the best experience with the interactive visualizations and controls, please use a desktop or laptop computer.</p>
             <p>You can continue on mobile, but some features may be limited.</p>
-            <button class="button" onclick="alignmentLandscape.dismissMobileModal()">Continue Anyway</button>
+            <button class="button" onclick="chartRenderer.dismissMobileModal()">Continue Anyway</button>
         </div>
     </div>
     
@@ -545,6 +590,6 @@
     <script src="survey-config.js"></script>
     <script src="metalog-utils.js"></script>
     <script src="survey-logic.js"></script>
-    <script defer src="alignment_landscape_new.js"></script>
+    <script defer src="chart-renderer.js"></script>
 </body>
 </html>

@@ -8,49 +8,204 @@ class SurveyLogic {
         
         // Survey state
         this.currentStep = 0;
-        this.totalSteps = 1 + 1 + 1 + 1 +
-            SURVEY_CONFIG.predefinedApproaches.length +
-            1 + SURVEY_CONFIG.predefinedInterventions.length + 1; // intro + example + metalog test + approaches title + approaches + interventions title + interventions + review
+        this.totalSteps = 5; // intro + example + metalog test + review + final
         this.completedSteps = new Set();
         this.hasInteracted = false;
         this.everCompleted = new Set(); // Track items that have been completed at least once
+        
+        // Centralized table state management
+        // Each table's data is stored as array of {x, y} pairs where x,y ∈ [0,1]
+        // Invariants: unique x-values, sorted by x, monotonic in y (CDF property)
+        this.tableStates = {};
+        
+        // Initialize default table states
+        this.initializeTableStates();
         
         // Store table-based metalog/linear data for export
         this.tableBasedData = null;
     }
 
+    // Initialize table states from default data
+    initializeTableStates() {
+        // Convert metalog test default data to normalized [0,1]² format
+        if (SURVEY_CONFIG.metalogTestCard?.defaultData) {
+            this.tableStates['metalog-test'] = SURVEY_CONFIG.metalogTestCard.defaultData.map(item => {
+                const timeYears = this.metalogUtils.parseTimeInput(item.time);
+                const probability = this.metalogUtils.parseProbabilityInput(item.probability);
+                return {
+                    x: this.metalogUtils.timeToNormalized(timeYears),
+                    y: probability
+                };
+            }).sort((a, b) => a.x - b.x); // Ensure sorted by x
+        } else {
+            // Fallback default data
+            this.tableStates['metalog-test'] = [
+                {x: this.metalogUtils.timeToNormalized(1), y: 0.25},
+                {x: this.metalogUtils.timeToNormalized(10), y: 0.50},
+                {x: this.metalogUtils.timeToNormalized(50), y: 0.75}
+            ];
+        }
+    }
+
+    // Core table state management methods
+    getTableState(tableId) {
+        if (!this.tableStates[tableId]) {
+            this.tableStates[tableId] = [];
+        }
+        return [...this.tableStates[tableId]]; // Return copy to prevent accidental mutation
+    }
+
+    setTableState(tableId, newData) {
+        // Validate and enforce invariants
+        const validatedData = this.validateAndCorrectTableData(newData);
+        this.tableStates[tableId] = validatedData;
+        
+        // Trigger UI update for this table
+        this.renderTable(tableId);
+        this.updateMetalogFromTable(tableId);
+    }
+
+    addTableRow(tableId, x, y) {
+        const currentData = this.getTableState(tableId);
+        
+        // Add the new point
+        currentData.push({x, y});
+        
+        // Update state (this will validate and re-render)
+        this.setTableState(tableId, currentData);
+    }
+
+    removeTableRow(tableId, index) {
+        const currentData = this.getTableState(tableId);
+        
+        if (currentData.length > 2 && index >= 0 && index < currentData.length) {
+            currentData.splice(index, 1);
+            this.setTableState(tableId, currentData);
+        }
+    }
+
+    updateTableCell(tableId, rowIndex, field, value) {
+        const currentData = this.getTableState(tableId);
+        
+        if (rowIndex >= 0 && rowIndex < currentData.length) {
+            currentData[rowIndex][field] = value;
+            this.setTableState(tableId, currentData);
+        }
+    }
+
+    // Validate and enforce table data invariants
+    validateAndCorrectTableData(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+            return [];
+        }
+
+        // Sort by x
+        const sorted = [...data].sort((a, b) => a.x - b.x);
+        
+        // Remove duplicates (keep first occurrence of each x value)
+        const unique = [];
+        const seenX = new Set();
+        
+        for (const point of sorted) {
+            if (!seenX.has(point.x)) {
+                seenX.add(point.x);
+                unique.push({
+                    x: Math.max(0, Math.min(1, point.x)), // Clamp to [0,1]
+                    y: Math.max(0, Math.min(1, point.y))  // Clamp to [0,1]
+                });
+            }
+        }
+        
+        // Enforce monotonic y (CDF property)
+        for (let i = 1; i < unique.length; i++) {
+            if (unique[i].y < unique[i-1].y) {
+                unique[i].y = unique[i-1].y; // Make it at least as large as previous
+            }
+        }
+        
+        return unique;
+    }
+
+    // Render table DOM from state
+    renderTable(tableId) {
+        const tableData = this.getTableState(tableId);
+        const tbody = document.querySelector(`[data-table-id="${tableId}"] tbody`);
+        
+        if (!tbody) {
+            console.warn(`Table with ID ${tableId} not found in DOM`);
+            return;
+        }
+
+        // Clear existing rows
+        tbody.innerHTML = '';
+
+        // Render rows from state
+        tableData.forEach((point, index) => {
+            const timeYears = this.metalogUtils.normalizedToTime(point.x);
+            const timeStr = this.metalogUtils.formatTime(timeYears);
+            const probStr = (point.y * 100).toFixed(0) + '%';
+
+            const row = document.createElement('tr');
+            row.dataset.row = index;
+            row.innerHTML = `
+                <td class="time-cell" contenteditable="true" data-type="time">${timeStr}</td>
+                <td class="prob-cell" contenteditable="true" data-type="probability">${probStr}</td>
+                <td><button class="remove-btn" onclick="surveyLogic.removeMetalogRow('${tableId}', ${index})">×</button></td>
+            `;
+
+            tbody.appendChild(row);
+        });
+
+        // Set up event listeners for all cells
+        this.setupTableEventListeners(tableId);
+    }
+
+    setupTableEventListeners(tableId) {
+        const table = document.querySelector(`[data-table-id="${tableId}"]`);
+        if (!table) return;
+
+        const cells = table.querySelectorAll('[contenteditable="true"]');
+        cells.forEach(cell => {
+            // Store initial value
+            cell.dataset.originalValue = cell.textContent;
+            
+            cell.addEventListener('focus', (e) => {
+                e.target.dataset.originalValue = e.target.textContent;
+            });
+            
+            cell.addEventListener('blur', (e) => {
+                this.handleCellEdit(e.target, tableId);
+            });
+            
+            cell.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.target.blur();
+                }
+            });
+        });
+    }
+
     // Survey navigation
     getCurrentItem() {
-        if (this.currentStep === 0) {
-            return { type: "intro", item: SURVEY_CONFIG.introCard };
-        } else if (this.currentStep === 1) {
-            return { type: "example", item: SURVEY_CONFIG.exampleCard };
-        } else if (this.currentStep === 2) {
-            return { type: "metalogTest", item: SURVEY_CONFIG.metalogTestCard };
-        } else if (this.currentStep === 3) {
-            return { type: "approachesTitle", item: SURVEY_CONFIG.approachesTitle };
-        } else if (this.currentStep >= 4 && this.currentStep < 4 + SURVEY_CONFIG.predefinedApproaches.length) {
-            const approachIndex = this.currentStep - 4;
-            return { type: "approach", item: SURVEY_CONFIG.predefinedApproaches[approachIndex] };
-        } else if (this.currentStep === 4 + SURVEY_CONFIG.predefinedApproaches.length) {
-            return { type: "interventionsTitle", item: SURVEY_CONFIG.interventionsTitle };
-        } else if (this.currentStep > 4 + SURVEY_CONFIG.predefinedApproaches.length && 
-                   this.currentStep < 4 + SURVEY_CONFIG.predefinedApproaches.length + 1 + SURVEY_CONFIG.predefinedInterventions.length) {
-            const interventionIndex = this.currentStep - (4 + SURVEY_CONFIG.predefinedApproaches.length + 1);
-            return { type: "intervention", item: SURVEY_CONFIG.predefinedInterventions[interventionIndex] };
-        } else {
-            return { type: "review", item: { title: "Review and Submit" } };
+        switch (this.currentStep) {
+            case 0:
+                return { type: "intro", item: SURVEY_CONFIG.introCard };
+            case 1:
+                return { type: "example", item: SURVEY_CONFIG.exampleCard };
+            case 2:
+                return { type: "metalogTest", item: SURVEY_CONFIG.metalogTestCard };
+            case 3:
+                return { type: "review", item: { title: "Review Your Distribution" } };
+            case 4:
+            default:
+                return { type: "final", item: { title: "Survey Complete" } };
         }
     }
 
     canProceed() {
-        const currentItem = this.getCurrentItem();
-        
-        if (currentItem.type === "approach" || currentItem.type === "intervention") {
-            return this.hasInteracted;
-        }
-        
-        return true; // Info cards, example, and metalog test can always proceed
+        // All steps can always proceed
+        return true;
     }
 
     nextStep() {
@@ -79,17 +234,24 @@ class SurveyLogic {
         document.getElementById("progress-fill").style.width = progressPercent + "%";
         
         // Update button states
-        document.getElementById("prevStep").disabled = this.currentStep === 0;
-        document.getElementById("nextStep").disabled = !this.canProceed() || this.currentStep === this.totalSteps - 1;
+        const prevButton = document.getElementById("prevStep");
+        const nextButton = document.getElementById("nextStep");
+        const navigationControls = document.querySelector(".navigation-controls");
         
-        // Show/hide survey complete
+        // Disable/enable buttons
+        prevButton.disabled = this.currentStep === 0;
+        nextButton.disabled = this.currentStep === this.totalSteps - 1;
+        
+        // Hide navigation controls entirely on final slide
         if (this.currentStep === this.totalSteps - 1) {
-            document.getElementById("survey-complete").style.display = "block";
-            document.getElementById("current-item-container").style.display = "none";
+            navigationControls.style.display = "none";
         } else {
-            document.getElementById("survey-complete").style.display = "none";
-            document.getElementById("current-item-container").style.display = "block";
+            navigationControls.style.display = "block";
         }
+        
+        // Always show the current item container (no more separate survey-complete div)
+        document.getElementById("current-item-container").style.display = "block";
+        document.getElementById("survey-complete").style.display = "none";
         
         // Update next button tooltip
         this.updateNextButtonTooltip();
@@ -99,39 +261,31 @@ class SurveyLogic {
         const tooltip = document.getElementById("nextTooltip");
         const button = document.getElementById("nextStep");
         
-        if (!this.canProceed()) {
-            tooltip.textContent = "Move one of the sliders to proceed";
-            tooltip.style.display = "block";
-            button.style.cursor = "not-allowed";
-        } else {
-            tooltip.style.display = "none";
-            button.style.cursor = "pointer";
-        }
+        // Hide tooltip since all steps can proceed
+        tooltip.style.display = "none";
+        button.style.cursor = "pointer";
     }
 
     showCurrentStep() {
         const container = document.getElementById("current-item-container");
         const currentItem = this.getCurrentItem();
 
-        // Reset interaction tracking for slider steps
-        if (currentItem.type === "approach" || currentItem.type === "intervention") {
-            this.hasInteracted = false;
-        }
-
-        if (currentItem.type === "intro" || 
-            currentItem.type === "approachesTitle" || 
-            currentItem.type === "interventionsTitle") {
-            this.createInfoCard(currentItem.item, container);
-        } else if (currentItem.type === "example") {
-            this.createExampleCard(currentItem.item, container);
-        } else if (currentItem.type === "metalogTest") {
-            this.createMetalogTestCard(currentItem.item, container);
-        } else if (currentItem.type === "review") {
-            this.createReviewUI(currentItem.item, container);
-        } else if (currentItem.type === "approach") {
-            this.createApproachUI(currentItem.item, container);
-        } else {
-            this.createInterventionUI(currentItem.item, container);
+        switch (currentItem.type) {
+            case "intro":
+                this.createInfoCard(currentItem.item, container);
+                break;
+            case "example":
+                this.createExampleCard(currentItem.item, container);
+                break;
+            case "metalogTest":
+                this.createMetalogTestCard(currentItem.item, container);
+                break;
+            case "review":
+                this.createReviewUI(currentItem.item, container);
+                break;
+            case "final":
+                this.createFinalUI(currentItem.item, container);
+                break;
         }
 
         this.updateProgressDisplay();
@@ -162,89 +316,112 @@ class SurveyLogic {
             <div class="info-card">
                 <h3>${card.title}</h3>
                 ${card.content}
-                ${card.showTable ? this.createMetalogDataTable(card.defaultData) : ''}
+                ${card.showTable ? this.createMetalogDataTable() : ''}
             </div>
         `;
         
-        // If we have a table, set up the event listeners
+        // If we have a table, render it from state
         if (card.showTable) {
-            this.setupMetalogTableEvents();
+            setTimeout(() => {
+                this.renderTable('metalog-test');
+                this.updateMetalogFromTable('metalog-test');
+            }, 100);
         }
     }
 
-    createMetalogDataTable(defaultData) {
+    createMetalogDataTable() {
+        const tableId = 'metalog-test';
         return `
             <div class="metalog-table-container">
                 <h4>Data Points</h4>
-                <table class="metalog-data-table">
+                <table class="metalog-data-table" id="metalog-table" data-table-id="${tableId}">
                     <thead>
                         <tr>
                             <th>Time</th>
                             <th>Probability</th>
-                            <th>Action</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="metalog-table-body">
-                        ${defaultData.map((row, index) => `
-                            <tr>
-                                <td><input type="text" class="table-input time-input" value="${row.time}" data-row="${index}"></td>
-                                <td><input type="text" class="table-input prob-input" value="${row.probability}" data-row="${index}"></td>
-                                <td><button class="remove-btn" onclick="surveyLogic.removeMetalogRow(${index})">Remove</button></td>
-                            </tr>
-                        `).join('')}
+                        <!-- Rows will be rendered from state -->
                     </tbody>
                 </table>
-                <button class="button" onclick="surveyLogic.addMetalogRow()">Add Row</button>
+                <button class="button" onclick="surveyLogic.addMetalogRow('${tableId}')">Add Row</button>
+                <div id="table-status" style="font-size: 11px; color: #666; margin-top: 5px;"></div>
             </div>
         `;
     }
 
-    // Metalog table management
-    setupMetalogTableEvents() {
-        setTimeout(() => {
-            const inputs = document.querySelectorAll('.table-input');
-            inputs.forEach(input => {
-                input.addEventListener('input', () => {
-                    this.validateTableInput(input);
-                    this.updateMetalogFromTable();
-                });
-                input.addEventListener('blur', () => {
-                    this.validateTableInput(input);
-                    this.updateMetalogFromTable();
-                });
-            });
-            // Initial validation and metalog rendering
-            this.validateAllTableInputs();
-            this.updateMetalogFromTable();
-        }, 100);
-    }
 
-    getMetalogTableData() {
-        const inputs = document.querySelectorAll('#metalog-table-body tr');
-        const data = [];
+    // Smart cell editing with state management
+    handleCellEdit(cell, tableId) {
+        const value = cell.textContent.trim();
+        const type = cell.dataset.type;
+        const row = cell.closest('tr');
+        const rowIndex = parseInt(row.dataset.row);
         
-        inputs.forEach(row => {
-            const timeInput = row.querySelector('.time-input');
-            const probInput = row.querySelector('.prob-input');
-            
-            if (timeInput && probInput) {
-                const timeYears = this.metalogUtils.parseTimeInput(timeInput.value);
-                const probability = this.metalogUtils.parseProbabilityInput(probInput.value);
-                
-                if (timeYears !== null && probability !== null) {
-                    data.push({
-                        x: timeYears,
-                        y: probability
-                    });
-                }
+        // Store original value to detect actual changes
+        const originalValue = cell.dataset.originalValue || '';
+        
+        console.log(`🔧 Cell edit: "${originalValue}" → "${value}" (${type}, row ${rowIndex})`);
+        
+        // Only process if value actually changed
+        if (value === originalValue) {
+            console.log('⚪ No change detected, skipping');
+            return;
+        }
+        
+        const currentData = this.getTableState(tableId);
+        if (rowIndex < 0 || rowIndex >= currentData.length) {
+            console.warn('Invalid row index:', rowIndex);
+            return;
+        }
+        
+        let newValue;
+        
+        if (type === 'time') {
+            const timeYears = this.metalogUtils.parseTimeInput(value);
+            if (timeYears === null) {
+                // Invalid format - revert
+                cell.textContent = originalValue;
+                cell.dataset.originalValue = originalValue;
+                return;
             }
-        });
+            newValue = this.metalogUtils.timeToNormalized(timeYears);
+            this.updateTableCell(tableId, rowIndex, 'x', newValue);
+        } else if (type === 'probability') {
+            const probability = this.metalogUtils.parseProbabilityInput(value);
+            if (probability === null) {
+                // Invalid format - revert
+                cell.textContent = originalValue;
+                cell.dataset.originalValue = originalValue;
+                return;
+            }
+            newValue = probability;
+            this.updateTableCell(tableId, rowIndex, 'y', newValue);
+        }
         
-        return data.sort((a, b) => a.y - b.y); // Sort by probability for metalog fitting
+        console.log(`🔄 Updated state: ${type} = ${newValue}`);
+    }
+    
+    
+    updateTableStatus(message, isError = false) {
+        const statusDiv = document.getElementById('table-status');
+        if (statusDiv) {
+            statusDiv.textContent = message;
+            statusDiv.style.color = isError ? '#d32f2f' : '#666';
+        }
     }
 
-    updateMetalogFromTable() {
-        const data = this.getMetalogTableData();
+
+    updateMetalogFromTable(tableId) {
+        const tableData = this.getTableState(tableId);
+        
+        // Convert normalized data to the format needed for metalog fitting
+        const data = tableData.map(point => ({
+            x: this.metalogUtils.normalizedToTime(point.x), // Convert back to years for metalog
+            y: point.y
+        }));
         
         // Log table update with pairs
         const pairs = data.map(d => `(${this.metalogUtils.formatTime(d.x)}, ${(d.y*100).toFixed(0)}%)`).join(', ');
@@ -255,7 +432,7 @@ class SurveyLogic {
         
         if (data.length < 2) {
             console.log("⚠️ Need at least 2 valid data points for metalog fitting");
-            this.showMetalogError("Need at least 2 valid data points");
+            this.updateTableStatus("Need at least 2 data points", true);
             return;
         }
         
@@ -271,6 +448,7 @@ class SurveyLogic {
                     originalData: data,
                     metalog: metalog
                 };
+                this.updateTableStatus(`Metalog fitted with ${data.length} points`);
             } else {
                 console.log("✅ Using piecewise linear fallback for table data");
                 const linearData = this.metalogUtils.createPiecewiseLinearData(data);
@@ -280,12 +458,13 @@ class SurveyLogic {
                     originalData: data,
                     interpolatedData: linearData
                 };
+                this.updateTableStatus(`Linear interpolation with ${data.length} points`);
             }
             this.hideMetalogError();
             
         } catch (error) {
             console.error("❌ Failed to update metalog from table:", error);
-            this.showMetalogError(error.message);
+            this.updateTableStatus(error.message, true);
         }
     }
 
@@ -309,245 +488,134 @@ class SurveyLogic {
         }
     }
 
-    addMetalogRow() {
-        const tbody = document.getElementById('metalog-table-body');
-        const rowCount = tbody.children.length;
+    addMetalogRow(tableId) {
+        const currentData = this.getTableState(tableId);
         
-        const newRow = document.createElement('tr');
-        newRow.innerHTML = `
-            <td><input type="text" class="table-input time-input" value="1 year" data-row="${rowCount}"></td>
-            <td><input type="text" class="table-input prob-input" value="50%" data-row="${rowCount}"></td>
-            <td><button class="remove-btn" onclick="surveyLogic.removeMetalogRow(${rowCount})">Remove</button></td>
-        `;
-        
-        tbody.appendChild(newRow);
-        
-        // Set up event listeners for the new inputs
-        const newInputs = newRow.querySelectorAll('.table-input');
-        newInputs.forEach(input => {
-            input.addEventListener('input', () => this.updateMetalogFromTable());
-            input.addEventListener('blur', () => this.updateMetalogFromTable());
-        });
-        
-        this.updateMetalogFromTable();
-    }
-
-    removeMetalogRow(index) {
-        const tbody = document.getElementById('metalog-table-body');
-        const rows = tbody.children;
-        
-        if (rows.length > 2) { // Keep at least 2 rows
-            rows[index].remove();
-            this.updateMetalogFromTable();
-        }
-    }
-
-    createApproachUI(approach, container) {
-        container.innerHTML = `
-            <h4>${approach.title}</h4>
-            <div class="item-description">${approach.description}</div>
-            <div class="control-section">
-                <div class="slider-group">
-                    <div class="slider-header">
-                        <label for="maxProb-${approach.id}">Maximum success probability:</label>
-                        <span class="slider-value" id="maxProbValue-${approach.id}">${Math.round(approach.maxProb * 100)}%</span>
-                    </div>
-                    <input type="range" id="maxProb-${approach.id}" min="0.01" max="1" step="0.01" value="${approach.maxProb}">
-                </div>
-                
-                <div class="slider-group">
-                    <div class="slider-header">
-                        <label for="steepness-${approach.id}">Steepness (how quickly it improves):</label>
-                        <span class="slider-value" id="steepnessValue-${approach.id}">${approach.steepness.toFixed(1)}</span>
-                    </div>
-                    <input type="range" id="steepness-${approach.id}" min="0.1" max="10" step="0.1" value="${approach.steepness}">
-                </div>
-                
-                <div class="slider-group">
-                    <div class="slider-header">
-                        <label for="inflection-${approach.id}">Time to reach 50% of max probability:</label>
-                        <span class="slider-value" id="inflectionValue-${approach.id}">${this.formatInflectionTime(approach.inflection)}</span>
-                    </div>
-                    <input type="range" id="inflection-${approach.id}" min="0" max="1" step="0.01" value="${approach.inflection}">
-                </div>
-            </div>
+        if (currentData.length === 0) {
+            // First row - start at reasonable point
+            const newX = this.metalogUtils.timeToNormalized(1); // 1 year
+            const newY = 0.5; // 50%
             
-            <div class="control-section">
-                <h4>Context</h4>
-                <table class="context-table">
-                    <tr>
-                        <th>Time</th>
-                        <th>1 year</th>
-                        <th>10 years</th>
-                        <th>50 years</th>
-                    </tr>
-                    <tr>
-                        <td><strong>Success probability</strong></td>
-                        <td id="prob-1y-${approach.id}">${this.formatProbability(this.calculateProbabilityAtTime(approach, 1))}</td>
-                        <td id="prob-10y-${approach.id}">${this.formatProbability(this.calculateProbabilityAtTime(approach, 10))}</td>
-                        <td id="prob-50y-${approach.id}">${this.formatProbability(this.calculateProbabilityAtTime(approach, 50))}</td>
-                    </tr>
-                </table>
-            </div>
-        `;
-
-        this.setupApproachSliders(approach);
-    }
-
-    createInterventionUI(intervention, container) {
-        container.innerHTML = `
-            <h4>${intervention.title}</h4>
-            <div class="item-description">${intervention.description}</div>
-            <div class="control-section">
-                <div class="slider-group">
-                    <div class="slider-header">
-                        <label for="mean-${intervention.id}">Most likely time gained:</label>
-                        <span class="slider-value" id="meanValue-${intervention.id}">${this.formatInflectionTime(intervention.mean)}</span>
-                    </div>
-                    <input type="range" id="mean-${intervention.id}" min="0" max="1" step="0.01" value="${intervention.mean}">
-                </div>
+            this.addTableRow(tableId, newX, newY);
+            return;
+        }
+        
+        // Check if there's a point at x=1
+        const hasPointAtOne = currentData.some(d => Math.abs(d.x - 1.0) < 0.001);
+        
+        let newX, newY;
+        
+        if (hasPointAtOne) {
+            // Case 1: Point exists at x=1, interpolate between last two points
+            // ((x_{n-1} + x_{n}) / 2, (y_{n-1} + y_{n}) / 2)
+            if (currentData.length >= 2) {
+                const last = currentData[currentData.length - 1];
+                const secondLast = currentData[currentData.length - 2];
                 
-                <div class="slider-group">
-                    <div class="slider-header">
-                        <label for="std-${intervention.id}">Uncertainty (standard deviation):</label>
-                        <span class="slider-value" id="stdValue-${intervention.id}">${intervention.std.toFixed(2)}</span>
-                    </div>
-                    <input type="range" id="std-${intervention.id}" min="0.05" max="0.5" step="0.01" value="${intervention.std}">
-                </div>
-            </div>
-        `;
-
-        this.setupInterventionSliders(intervention);
+                newX = (secondLast.x + last.x) / 2;
+                newY = (secondLast.y + last.y) / 2;
+            } else {
+                // Only one point at x=1, add at middle of range
+                newX = 0.5;
+                newY = 0.5;
+            }
+        } else {
+            // Case 2: No point at x=1, add point at (1, y) where y is from fitted logistic curve
+            newX = 1.0;
+            
+            if (currentData.length >= 2) {
+                // Use first and last points to fit logistic curve
+                const first = currentData[0];
+                const last = currentData[currentData.length - 1];
+                newY = this.evaluateLogisticCurve(first, last, newX);
+            } else {
+                // Only one point - simple extrapolation
+                const single = currentData[0];
+                newY = Math.min(0.99, single.y + (1.0 - single.x) * 0.3);
+            }
+        }
+        
+        this.addTableRow(tableId, newX, newY);
     }
+    
+    // Fit and evaluate logistic curve: 1/(1 + exp(-s*(x-i)))
+    evaluateLogisticCurve(firstPoint, lastPoint, targetX) {
+        const x1 = firstPoint.x;
+        const y1 = firstPoint.y;
+        const x2 = lastPoint.x;
+        const y2 = lastPoint.y;
+        
+        // Prevent division by zero and handle edge cases
+        if (Math.abs(x2 - x1) < 0.001) {
+            return (y1 + y2) / 2;
+        }
+        
+        // Convert probabilities to logit space for fitting
+        const logit1 = Math.log(y1 / (1 - y1));
+        const logit2 = Math.log(y2 / (1 - y2));
+        
+        // Fit linear relationship in logit space: logit = s*x + c
+        const s = (logit2 - logit1) / (x2 - x1);
+        const c = logit1 - s * x1;
+        
+        // Evaluate at target point
+        const targetLogit = s * targetX + c;
+        const targetY = 1 / (1 + Math.exp(-targetLogit));
+        
+        // Clamp to valid probability range
+        return Math.max(0.01, Math.min(0.99, targetY));
+    }
+    
+
+    removeMetalogRow(tableId, index) {
+        this.removeTableRow(tableId, index);
+    }
+
 
     createReviewUI(item, container) {
+        const tableData = this.getTableState('metalog-test');
+        const dataPoints = tableData.map(point => {
+            const timeYears = this.metalogUtils.normalizedToTime(point.x);
+            const timeStr = this.metalogUtils.formatTime(timeYears);
+            const probStr = (point.y * 100).toFixed(0) + '%';
+            return `${timeStr}: ${probStr}`;
+        }).join(', ');
+
         container.innerHTML = `
             <div class="info-card">
                 <h3>${item.title}</h3>
-                <p>Review your responses below. You can click on any item to return to that step and make changes.</p>
+                <p>Here's the distribution you created:</p>
                 
-                <div class="review-lists">
-                    <div class="review-section">
-                        <h4>Alignment Approaches</h4>
-                        <ul class="review-list" id="approaches-review"></ul>
-                    </div>
-                    <div class="review-section">
-                        <h4>Governance Interventions</h4>
-                        <ul class="review-list" id="interventions-review"></ul>
-                    </div>
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <strong>Your Data Points:</strong><br>
+                    ${dataPoints}
                 </div>
+                
+                <p>The chart shows your fitted curve. You can go back to adjust the data if needed, or proceed to finish.</p>
             </div>
         `;
-
-        this.populateReviewLists();
     }
 
-    // Helper methods
-    formatInflectionTime(normalizedTime) {
-        const timeInYears = this.metalogUtils.normalizedToTime(normalizedTime);
-        return this.metalogUtils.formatTime(timeInYears);
+    createFinalUI(item, container) {
+        container.innerHTML = `
+            <div class="info-card">
+                <h3>${item.title}</h3>
+                <p>Thank you for completing the distribution builder!</p>
+                <p>Your data has been processed and can be copied below for further analysis.</p>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <button class="button" onclick="chartRenderer.copyDataToClipboard()">
+                        Copy Distribution Data
+                    </button>
+                </div>
+                
+                <p style="font-size: 0.9em; color: #666;">
+                    The copied data includes your data points, fitted curves, and metadata.
+                </p>
+            </div>
+        `;
     }
 
-    formatProbability(prob) {
-        return (prob * 100).toFixed(0) + "%";
-    }
-
-    calculateProbabilityAtTime(approach, timeInYears) {
-        const normalizedTime = this.metalogUtils.timeToNormalized(timeInYears);
-        const inflectionTime = this.metalogUtils.normalizedToTime(approach.inflection);
-        const prob = approach.maxProb / (1 + Math.exp(-approach.steepness * (timeInYears - inflectionTime)));
-        return Math.max(0, Math.min(1, prob));
-    }
-
-    setupApproachSliders(approach) {
-        const maxProbSlider = document.getElementById(`maxProb-${approach.id}`);
-        const steepnessSlider = document.getElementById(`steepness-${approach.id}`);
-        const inflectionSlider = document.getElementById(`inflection-${approach.id}`);
-
-        const updateApproach = () => {
-            approach.maxProb = parseFloat(maxProbSlider.value);
-            approach.steepness = parseFloat(steepnessSlider.value);
-            approach.inflection = parseFloat(inflectionSlider.value);
-
-            // Update display values
-            document.getElementById(`maxProbValue-${approach.id}`).textContent = Math.round(approach.maxProb * 100) + "%";
-            document.getElementById(`steepnessValue-${approach.id}`).textContent = approach.steepness.toFixed(1);
-            document.getElementById(`inflectionValue-${approach.id}`).textContent = this.formatInflectionTime(approach.inflection);
-
-            // Update context table
-            document.getElementById(`prob-1y-${approach.id}`).textContent = this.formatProbability(this.calculateProbabilityAtTime(approach, 1));
-            document.getElementById(`prob-10y-${approach.id}`).textContent = this.formatProbability(this.calculateProbabilityAtTime(approach, 10));
-            document.getElementById(`prob-50y-${approach.id}`).textContent = this.formatProbability(this.calculateProbabilityAtTime(approach, 50));
-
-            this.hasInteracted = true;
-            this.visualizer.updateVisualization();
-            this.updateProgressDisplay();
-        };
-
-        maxProbSlider.addEventListener('input', updateApproach);
-        steepnessSlider.addEventListener('input', updateApproach);
-        inflectionSlider.addEventListener('input', updateApproach);
-    }
-
-    setupInterventionSliders(intervention) {
-        const meanSlider = document.getElementById(`mean-${intervention.id}`);
-        const stdSlider = document.getElementById(`std-${intervention.id}`);
-
-        const updateIntervention = () => {
-            intervention.mean = parseFloat(meanSlider.value);
-            intervention.std = parseFloat(stdSlider.value);
-
-            // Update display values
-            document.getElementById(`meanValue-${intervention.id}`).textContent = this.formatInflectionTime(intervention.mean);
-            document.getElementById(`stdValue-${intervention.id}`).textContent = intervention.std.toFixed(2);
-
-            this.hasInteracted = true;
-            this.visualizer.updateVisualization();
-            this.updateProgressDisplay();
-        };
-
-        meanSlider.addEventListener('input', updateIntervention);
-        stdSlider.addEventListener('input', updateIntervention);
-    }
-
-    populateReviewLists() {
-        const approachsList = document.getElementById('approaches-review');
-        const interventionsList = document.getElementById('interventions-review');
-
-        // Clear existing content
-        approachsList.innerHTML = '';
-        interventionsList.innerHTML = '';
-
-        // Add approaches
-        SURVEY_CONFIG.predefinedApproaches.forEach((approach, index) => {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.href = '#';
-            a.textContent = approach.title;
-            a.onclick = (e) => {
-                e.preventDefault();
-                this.currentStep = 4 + index;
-                this.showCurrentStep();
-            };
-            li.appendChild(a);
-            approachsList.appendChild(li);
-        });
-
-        // Add interventions
-        SURVEY_CONFIG.predefinedInterventions.forEach((intervention, index) => {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.href = '#';
-            a.textContent = intervention.title;
-            a.onclick = (e) => {
-                e.preventDefault();
-                this.currentStep = 4 + SURVEY_CONFIG.predefinedApproaches.length + 1 + index;
-                this.showCurrentStep();
-            };
-            li.appendChild(a);
-            interventionsList.appendChild(li);
-        });
-    }
 }
 
 // Export as global
