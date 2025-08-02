@@ -8,7 +8,7 @@ class ChartRenderer {
 
         // Initialize utilities
         this.metalogUtils = new MetalogUtils();
-        
+
         // Chart state
         this.approachesHeight = SURVEY_CONFIG.approachesHeight;
         this.yAxisTransformed = false;
@@ -24,14 +24,17 @@ class ChartRenderer {
     }
 
     // === INITIALIZATION ===
-    
+
     init() {
         this.svg = d3.select("#chart")
             .append("svg")
             .attr("width", this.width + this.margin.left + this.margin.right)
             .attr("height", this.height + this.margin.top + this.margin.bottom)
             .append("g")
-            .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
+            .attr(
+                "transform",
+                `translate(${this.margin.left},${this.margin.top})`,
+            );
 
         this.setupScalesAndAxes();
     }
@@ -55,10 +58,10 @@ class ChartRenderer {
     createAxes() {
         // Time ticks for x-axis
         const timeTicks = this.getTimeTicks();
-        
+
         // Axes
         const xAxis = d3.axisBottom(this.xScale)
-            .tickValues(timeTicks.map(d => d.position))
+            .tickValues(timeTicks.map((d) => d.position))
             .tickFormat((d, i) => timeTicks[i].label);
 
         const yAxisApproaches = d3.axisLeft(this.yScaleApproaches)
@@ -77,7 +80,7 @@ class ChartRenderer {
 
         // Grid lines
         const xGrid = d3.axisBottom(this.xScale)
-            .tickValues(timeTicks.map(d => d.position))
+            .tickValues(timeTicks.map((d) => d.position))
             .tickSize(-this.height)
             .tickFormat("");
 
@@ -100,17 +103,53 @@ class ChartRenderer {
         const oneWeekInYears = 7 / 365.25;
         const oneMonthInYears = 1 / 12;
         const oneCenturyInYears = 100;
-        
+
         return [
-            { years: oneDayInYears, label: "1 day", position: this.metalogUtils.timeToNormalized(oneDayInYears) },
-            { years: oneWeekInYears, label: "1 week", position: this.metalogUtils.timeToNormalized(oneWeekInYears) },
-            { years: oneMonthInYears, label: "1 month", position: this.metalogUtils.timeToNormalized(oneMonthInYears) },
-            { years: 0.25, label: "3 months", position: this.metalogUtils.timeToNormalized(0.25) },
-            { years: 1, label: "1 year", position: this.metalogUtils.timeToNormalized(1) },
-            { years: 3, label: "3 years", position: this.metalogUtils.timeToNormalized(3) },
-            { years: 10, label: "10 years", position: this.metalogUtils.timeToNormalized(10) },
-            { years: 30, label: "30 years", position: this.metalogUtils.timeToNormalized(30) },
-            { years: oneCenturyInYears, label: "1 century", position: this.metalogUtils.timeToNormalized(oneCenturyInYears) }
+            {
+                years: oneDayInYears,
+                label: "1 day",
+                position: this.metalogUtils.timeToNormalized(oneDayInYears),
+            },
+            {
+                years: oneWeekInYears,
+                label: "1 week",
+                position: this.metalogUtils.timeToNormalized(oneWeekInYears),
+            },
+            {
+                years: oneMonthInYears,
+                label: "1 month",
+                position: this.metalogUtils.timeToNormalized(oneMonthInYears),
+            },
+            {
+                years: 0.25,
+                label: "3 months",
+                position: this.metalogUtils.timeToNormalized(0.25),
+            },
+            {
+                years: 1,
+                label: "1 year",
+                position: this.metalogUtils.timeToNormalized(1),
+            },
+            {
+                years: 3,
+                label: "3 years",
+                position: this.metalogUtils.timeToNormalized(3),
+            },
+            {
+                years: 10,
+                label: "10 years",
+                position: this.metalogUtils.timeToNormalized(10),
+            },
+            {
+                years: 30,
+                label: "30 years",
+                position: this.metalogUtils.timeToNormalized(30),
+            },
+            {
+                years: oneCenturyInYears,
+                label: "1 century",
+                position: this.metalogUtils.timeToNormalized(oneCenturyInYears),
+            },
         ];
     }
 
@@ -118,10 +157,10 @@ class ChartRenderer {
 
     drawMetalogCurve(metalog, name, index) {
         const data = this.generateMetalogPlotData(metalog);
-        
+
         const line = d3.line()
-            .x(d => this.xScale(d.x))
-            .y(d => this.yScaleApproaches(this.transformY(d.y)))
+            .x((d) => this.xScale(d.x))
+            .y((d) => this.yScaleApproaches(this.transformY(d.y)))
             .curve(d3.curveMonotoneX);
 
         const curve = this.svg.append("path")
@@ -137,10 +176,10 @@ class ChartRenderer {
 
     drawPiecewiseLinearCurve(linearData, name, index) {
         const line = d3.line()
-            .x(d => this.xScale(d.x))
-            .y(d => this.yScaleApproaches(this.transformY(d.y)))
+            .x((d) => this.xScale(d.x))
+            .y((d) => this.yScaleApproaches(this.transformY(d.y)))
             .curve(d3.curveMonotoneX);
-            
+
         const curve = this.svg.append("path")
             .datum(linearData)
             .attr("class", "s-curve")
@@ -148,7 +187,11 @@ class ChartRenderer {
             .attr("clip-path", "url(#chart-area)")
             .style("stroke", this.getColor(index));
 
-        this.addCurveInteractions(curve, name + " (smooth interpolation fallback)", { dataPoints: linearData });
+        this.addCurveInteractions(
+            curve,
+            name + " (smooth interpolation fallback)",
+            { dataPoints: linearData },
+        );
         this.addCurveLabel(name, index);
     }
 
@@ -156,8 +199,8 @@ class ChartRenderer {
         const data = this.generateSCurveData(approach);
 
         const line = d3.line()
-            .x(d => this.xScale(d.x))
-            .y(d => this.yScaleApproaches(this.transformY(d.y)))
+            .x((d) => this.xScale(d.x))
+            .y((d) => this.yScaleApproaches(this.transformY(d.y)))
             .curve(d3.curveMonotoneX);
 
         const curve = this.svg.append("path")
@@ -167,8 +210,11 @@ class ChartRenderer {
             .style("stroke", this.getColor(index));
 
         if (showTooltip) {
-            curve.on("mouseover", event => this.showTooltip(event, approach.title))
-                 .on("mouseout", () => this.hideTooltip());
+            curve.on(
+                "mouseover",
+                (event) => this.showTooltip(event, approach.title),
+            )
+                .on("mouseout", () => this.hideTooltip());
         }
 
         this.addCurveLabel(approach.title, index);
@@ -184,17 +230,20 @@ class ChartRenderer {
         const dataPoints = metalog.dataPoints;
         const minDataY = dataPoints[0].y;
         const maxDataY = dataPoints[dataPoints.length - 1].y;
-        
-        const minPlotY = this.findSafePlottingBound(metalog, minDataY, 'min');
-        const maxPlotY = this.findSafePlottingBound(metalog, maxDataY, 'max');
-        
+
+        const minPlotY = this.findSafePlottingBound(metalog, minDataY, "min");
+        const maxPlotY = this.findSafePlottingBound(metalog, maxDataY, "max");
+
         // Sample points within the safe range
         for (let i = 0; i <= numPoints; i++) {
             const cdfProb = minPlotY + (maxPlotY - minPlotY) * (i / numPoints);
-            const normalizedTime = this.metalogUtils.evaluateMetalog(metalog, cdfProb);
+            const normalizedTime = this.metalogUtils.evaluateMetalog(
+                metalog,
+                cdfProb,
+            );
             data.push({ x: normalizedTime, y: cdfProb });
         }
-        
+
         return data;
     }
 
@@ -203,26 +252,32 @@ class ChartRenderer {
         for (let i = 0; i <= 100; i++) {
             const x = i / 100;
             const timeInYears = this.metalogUtils.normalizedToTime(x);
-            const inflectionTime = this.metalogUtils.normalizedToTime(approach.inflection);
-            const y = approach.maxProb / (1 + Math.exp(-approach.steepness * (timeInYears - inflectionTime)));
+            const inflectionTime = this.metalogUtils.normalizedToTime(
+                approach.inflection,
+            );
+            const y = approach.maxProb /
+                (1 +
+                    Math.exp(
+                        -approach.steepness * (timeInYears - inflectionTime),
+                    ));
             data.push({ x, y });
         }
         return data;
     }
 
     findSafePlottingBound(metalog, startY, direction) {
-        const targetXRange = direction === 'min' ? -0.2 : 1.2;
+        const targetXRange = direction === "min" ? -0.2 : 1.2;
         const epsilon = 0.001;
         const maxIterations = 20;
-        
-        let lowY = direction === 'min' ? 0.001 : startY;
-        let highY = direction === 'min' ? startY : 0.999;
-        
+
+        let lowY = direction === "min" ? 0.001 : startY;
+        let highY = direction === "min" ? startY : 0.999;
+
         for (let i = 0; i < maxIterations; i++) {
             const midY = (lowY + highY) / 2;
             const x = this.metalogUtils.evaluateMetalog(metalog, midY);
-            
-            if (direction === 'min') {
+
+            if (direction === "min") {
                 if (x < targetXRange) {
                     lowY = midY;
                 } else {
@@ -235,19 +290,22 @@ class ChartRenderer {
                     lowY = midY;
                 }
             }
-            
+
             if (Math.abs(highY - lowY) < epsilon) break;
         }
-        
+
         return (lowY + highY) / 2;
     }
 
     // === INTERACTIONS ===
 
     addCurveInteractions(curve, name, metalog) {
-        curve.on("mouseover", event => this.showTooltip(event, name))
-             .on("mousemove", event => this.showCoordinateTooltip(event, metalog))
-             .on("mouseout", () => this.hideTooltip());
+        curve.on("mouseover", (event) => this.showTooltip(event, name))
+            .on(
+                "mousemove",
+                (event) => this.showCoordinateTooltip(event, metalog),
+            )
+            .on("mouseout", () => this.hideTooltip());
     }
 
     showTooltip(event, text) {
@@ -255,9 +313,12 @@ class ChartRenderer {
         tooltip.style.display = "block";
         tooltip.style.left = (event.pageX + 10) + "px";
         tooltip.style.top = (event.pageY - 10) + "px";
-        
+
         if (text.includes("smooth interpolation fallback")) {
-            const baseName = text.replace(" (smooth interpolation fallback)", "");
+            const baseName = text.replace(
+                " (smooth interpolation fallback)",
+                "",
+            );
             tooltip.innerHTML = `
                 <div style="font-weight: bold;">${baseName}</div>
                 <div style="font-size: 11px; color: #ffa726; margin-top: 3px; padding: 2px 4px; background: rgba(255,167,38,0.1); border-radius: 3px;">
@@ -275,13 +336,13 @@ class ChartRenderer {
 
     showCoordinateTooltip(event, metalog) {
         const [mouseX, mouseY] = d3.pointer(event);
-        
+
         const normalizedTime = this.xScale.invert(mouseX);
         const transformedProb = this.yScaleApproaches.invert(mouseY);
         const probability = this.inverseTransformY(transformedProb);
         const timeInYears = this.metalogUtils.normalizedToTime(normalizedTime);
         const timeStr = this.metalogUtils.formatTime(timeInYears);
-        
+
         const tooltip = document.getElementById("tooltip");
         tooltip.innerHTML = `
             <strong>Coordinates:</strong><br/>
@@ -308,7 +369,17 @@ class ChartRenderer {
                 this.drawExampleVisualization();
                 break;
             case "metalogTest":
-                // Metalog curves are drawn by survey logic when table updates
+                // Redraw metalog curve if it exists (needed for Y-axis transformations)
+                if (
+                    this.surveyLogic.tableBasedData &&
+                    this.surveyLogic.tableBasedData.metalog
+                ) {
+                    this.drawMetalogCurve(
+                        this.surveyLogic.tableBasedData.metalog,
+                        "Example",
+                        0,
+                    );
+                }
                 break;
             case "approach":
                 this.drawApproachVisualization(currentItem.item);
@@ -321,9 +392,9 @@ class ChartRenderer {
             title: "Interpretability",
             maxProb: 0.7,
             steepness: 0.3,
-            inflection: this.metalogUtils.timeToNormalized(10)
+            inflection: this.metalogUtils.timeToNormalized(10),
         };
-        
+
         this.drawSCurve(exampleApproach, 0, false);
     }
 
@@ -335,13 +406,11 @@ class ChartRenderer {
 
     toggleYAxisTransformation() {
         this.yAxisTransformed = !this.yAxisTransformed;
-        
+
         // Update button text
         const button = document.getElementById("yAxisToggle");
-        button.textContent = this.yAxisTransformed ? 
-            "Use Linear Y-axis" : 
-            "Transform Y-axis for Small Probabilities";
-        
+        button.textContent = "Switch y-axis";
+
         // Animate the transformation
         this.animateYAxisTransformation();
     }
@@ -349,7 +418,7 @@ class ChartRenderer {
     // Transform probability value using current exponent
     transformY(probability) {
         const exponent = this.currentExponent || 1;
-        return Math.pow(probability, 1/exponent);
+        return Math.pow(probability, 1 / exponent);
     }
 
     // Inverse transform for converting back from display to probability
@@ -361,25 +430,26 @@ class ChartRenderer {
     animateYAxisTransformation() {
         const duration = 1200; // ms - longer for smoother tick animation
         const startExponent = this.currentExponent || 1;
-        const endExponent = this.yAxisTransformed ? 3 : 1;
-        
+        const endExponent = this.yAxisTransformed ? 2.5 : 1;
+
         // Start animation
         const startTime = Date.now();
-        
+
         const animate = () => {
             const elapsed = Date.now() - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            
+
             // Smooth easing function
             const eased = 0.5 - 0.5 * Math.cos(progress * Math.PI);
-            
+
             // Interpolate the exponent from 1 to 3 (or vice versa)
-            this.currentExponent = startExponent + (endExponent - startExponent) * eased;
-            
+            this.currentExponent = startExponent +
+                (endExponent - startExponent) * eased;
+
             // Update everything
             this.updateYAxisWithAnimation();
             this.updateVisualization();
-            
+
             if (progress < 1) {
                 requestAnimationFrame(animate);
             } else {
@@ -389,39 +459,39 @@ class ChartRenderer {
                 this.updateVisualization();
             }
         };
-        
+
         requestAnimationFrame(animate);
     }
 
     updateYAxisWithAnimation() {
         const isTransformed = this.currentExponent > 1.1;
-        
+
         // Define tick sets
         const linearTicks = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
-        const transformedTicks = [0, 0.05, 0.1, 0.15, 0.25, 0.5, 0.75, 1.0];
-        
+        const transformedTicks = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 1.0];
+
         // Calculate positions and opacity for each tick set
-        const progress = (this.currentExponent - 1) / 2; // 0 to 1 as exponent goes 1 to 3
-        
+        const progress = (this.currentExponent - 1) / 1.5; // 0 to 1 as exponent goes 1 to 2.5
+
         // Update or create tick groups
-        this.updateTickGroup('linear-ticks', linearTicks, 1 - progress);
-        this.updateTickGroup('transformed-ticks', transformedTicks, progress);
+        this.updateTickGroup("linear-ticks", linearTicks, 1 - progress);
+        this.updateTickGroup("transformed-ticks", transformedTicks, progress);
     }
 
     updateTickGroup(className, ticks, opacity) {
         // Remove existing group
         this.svg.selectAll(`.${className}`).remove();
-        
+
         if (opacity < 0.01) return; // Don't draw if nearly invisible
-        
+
         const tickGroup = this.svg.append("g")
             .attr("class", `axis ${className}`)
             .style("opacity", opacity);
-        
-        ticks.forEach(tickValue => {
+
+        ticks.forEach((tickValue) => {
             const transformedValue = this.transformY(tickValue);
             const yPos = this.yScaleApproaches(transformedValue);
-            
+
             // Tick line
             tickGroup.append("line")
                 .attr("x1", -6)
@@ -430,14 +500,17 @@ class ChartRenderer {
                 .attr("y2", yPos)
                 .style("stroke", "#666")
                 .style("shape-rendering", "crispEdges");
-            
+
             // Tick label
             tickGroup.append("text")
                 .attr("x", -9)
                 .attr("y", yPos)
                 .attr("dy", "0.32em")
                 .style("text-anchor", "end")
-                .style("font-family", "'et-book', 'Palatino Linotype', 'Book Antiqua', Palatino, serif")
+                .style(
+                    "font-family",
+                    "'et-book', 'Palatino Linotype', 'Book Antiqua', Palatino, serif",
+                )
                 .style("font-size", "12px")
                 .style("fill", "#666")
                 .text(d3.format(".0%")(tickValue));
@@ -447,7 +520,16 @@ class ChartRenderer {
     // === UTILITIES ===
 
     getColor(index) {
-        const colors = ["#2A623D", "#8B4513", "#1E90FF", "#FF6347", "#32CD32", "#FF1493", "#FFD700", "#9370DB"];
+        const colors = [
+            "#2A623D",
+            "#8B4513",
+            "#1E90FF",
+            "#FF6347",
+            "#32CD32",
+            "#FF1493",
+            "#FFD700",
+            "#9370DB",
+        ];
         return colors[index % colors.length];
     }
 
@@ -455,7 +537,7 @@ class ChartRenderer {
         const color = this.getColor(index);
         const x = this.width - 140;
         const y = 20 + index * 20;
-        
+
         this.svg.append("text")
             .attr("x", x)
             .attr("y", y)
@@ -477,9 +559,12 @@ class ChartRenderer {
             this.surveyLogic.prevStep();
         });
 
-        document.getElementById("copyToClipboard").addEventListener("click", () => {
-            this.copyDataToClipboard();
-        });
+        document.getElementById("copyToClipboard").addEventListener(
+            "click",
+            () => {
+                this.copyDataToClipboard();
+            },
+        );
 
         document.getElementById("yAxisToggle").addEventListener("click", () => {
             this.toggleYAxisTransformation();
@@ -489,13 +574,13 @@ class ChartRenderer {
     copyDataToClipboard() {
         const data = {
             tableBasedData: this.surveyLogic.tableBasedData,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         };
 
         const jsonString = JSON.stringify(data, null, 2);
         const button = event.target;
         const originalText = button.textContent;
-        
+
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(jsonString).then(() => {
                 this.showCopySuccess(button, originalText);
@@ -522,12 +607,12 @@ class ChartRenderer {
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        
+
         try {
-            document.execCommand('copy');
+            document.execCommand("copy");
             this.showCopySuccess(button, originalText);
         } catch (err) {
-            console.error('Failed to copy: ', err);
+            console.error("Failed to copy: ", err);
             button.textContent = "Copy failed - see console";
             button.style.backgroundColor = "#f44336";
             console.log("Survey data:", jsonString);
@@ -536,15 +621,17 @@ class ChartRenderer {
                 button.style.backgroundColor = "#2A623D";
             }, 2000);
         }
-        
+
         document.body.removeChild(textArea);
     }
 
     // === MOBILE SUPPORT ===
 
     checkMobileAndShowModal() {
-        const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
+        const isMobile = window.innerWidth <= 768 ||
+            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
+                .test(navigator.userAgent);
+
         if (isMobile) {
             document.getElementById("mobile-modal").style.display = "flex";
         }
@@ -562,7 +649,7 @@ let surveyLogic;
 window.addEventListener("load", function () {
     chartRenderer = new ChartRenderer();
     surveyLogic = chartRenderer.surveyLogic; // Make available globally for onclick handlers
-    
+
     // Start the survey
     chartRenderer.surveyLogic.showCurrentStep();
 });
