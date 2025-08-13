@@ -369,16 +369,21 @@ class ChartRenderer {
                 this.drawExampleVisualization();
                 break;
             case "metalogTest":
-                // Redraw metalog curve if it exists (needed for Y-axis transformations)
-                if (
-                    this.surveyLogic.tableBasedData &&
-                    this.surveyLogic.tableBasedData.metalog
-                ) {
-                    this.drawMetalogCurve(
-                        this.surveyLogic.tableBasedData.metalog,
-                        "Example",
-                        0,
-                    );
+                // Redraw curve if it exists (needed for Y-axis transformations)
+                if (this.surveyLogic.tableBasedData) {
+                    if (this.surveyLogic.tableBasedData.type === "metalog" && this.surveyLogic.tableBasedData.metalog) {
+                        this.drawMetalogCurve(
+                            this.surveyLogic.tableBasedData.metalog,
+                            "Table-based Approach",
+                            0,
+                        );
+                    } else if (this.surveyLogic.tableBasedData.type === "linear_interpolation" && this.surveyLogic.tableBasedData.interpolatedData) {
+                        this.drawPiecewiseLinearCurve(
+                            this.surveyLogic.tableBasedData.interpolatedData,
+                            "Table-based Approach", 
+                            0,
+                        );
+                    }
                 }
                 break;
             case "approach":

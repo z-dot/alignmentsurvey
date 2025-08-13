@@ -105,10 +105,10 @@ class MetalogUtils {
             }
         }
         
-        // Check times are positive
+        // Check times are positive (but we're now working in [0,1] space, so this should be >= 0)
         for (let i = 0; i < data.length; i++) {
-            if (data[i].x <= 0) {
-                return { valid: false, error: "All times must be positive" };
+            if (data[i].x < 0) {
+                return { valid: false, error: "All times must be non-negative" };
             }
         }
         
@@ -1060,12 +1060,9 @@ class MetalogUtils {
 
     // Fit unconstrained metalog using simple least squares
     fitUnconstrainedMetalog(dataPoints, numTerms) {
-        // Sort and normalize points
+        // Sort points (they're already in [0,1] space)
         const sortedPoints = [...dataPoints].sort((a, b) => a.y - b.y);
-        const normalizedPoints = sortedPoints.map(point => ({
-            x: this.timeToNormalized(point.x),
-            y: point.y
-        }));
+        const normalizedPoints = sortedPoints; // Already normalized
         
         const n = normalizedPoints.length;
         const k = Math.min(numTerms, n);
@@ -1118,14 +1115,14 @@ class MetalogUtils {
         console.log("🔍 Quality check details:");
         for (const point of originalDataPoints) {
             const targetProbability = point.y;
-            const actualTime = this.timeToNormalized(point.x);
+            const actualTime = point.x; // Already in [0,1] space
             const predictedTime = this.evaluateMetalog(metalog, targetProbability);
             const timeError = Math.abs(actualTime - predictedTime);
             
             const actualTimeYears = this.normalizedToTime(actualTime);
             const predictedTimeYears = this.normalizedToTime(predictedTime);
             
-            console.log(`   ${this.formatTime(point.x)} @ ${(point.y*100).toFixed(0)}%: predicted ${this.formatTime(predictedTimeYears)}, error=${timeError.toFixed(4)}`);
+            console.log(`   ${this.formatTime(actualTimeYears)} @ ${(point.y*100).toFixed(0)}%: predicted ${this.formatTime(predictedTimeYears)}, error=${timeError.toFixed(4)}`);
             
             if (timeError > threshold) {
                 console.log(`📊 Quality check failed: time error ${timeError.toFixed(4)} > ${threshold}`);
@@ -1142,12 +1139,13 @@ class MetalogUtils {
         const sortedPoints = [...originalDataPoints].sort((a, b) => a.y - b.y);
         
         for (const point of sortedPoints) {
-            const normalizedTime = this.timeToNormalized(point.x);
+            const normalizedTime = point.x; // Already in [0,1] space
             const predictedTime = this.evaluateMetalog(metalog, point.y);
             const relativeError = Math.abs(normalizedTime - predictedTime) / normalizedTime;
             
             if (relativeError > threshold) {
-                console.log(`📊 Error threshold exceeded at ${this.formatTime(point.x)} @ ${(point.y*100).toFixed(0)}%: ${(relativeError*100).toFixed(1)}% > ${(threshold*100).toFixed(1)}%`);
+                const timeYears = this.normalizedToTime(point.x);
+                console.log(`📊 Error threshold exceeded at ${this.formatTime(timeYears)} @ ${(point.y*100).toFixed(0)}%: ${(relativeError*100).toFixed(1)}% > ${(threshold*100).toFixed(1)}%`);
                 return false;
             }
         }
@@ -1205,18 +1203,20 @@ class MetalogUtils {
             // Fit logistic curve
             const logistic = this.fitLogisticCurve(fitPoints);
             
-            // Add boundary points if needed
+            // Add boundary points if needed with monotonicity constraints
             if (points[0].x > 0.001) {
-                const y0 = this.evaluateLogistic(logistic, 0);
+                const y0Raw = this.evaluateLogistic(logistic, 0);
+                const y0 = Math.min(y0Raw, points[0].y); // Left boundary must be ≤ first point
                 points.unshift({ x: 0, y: y0 });
-                console.log(`📊 Added logistic boundary: (0, ${y0.toFixed(3)})`);
+                console.log(`📊 Added logistic boundary: (0, ${y0.toFixed(3)}) [raw: ${y0Raw.toFixed(3)}]`);
             }
             
             const lastPoint = points[points.length - 1];
             if (lastPoint.x < 0.999) {
-                const y1 = this.evaluateLogistic(logistic, 1);
+                const y1Raw = this.evaluateLogistic(logistic, 1);
+                const y1 = Math.max(y1Raw, lastPoint.y); // Right boundary must be ≥ last point
                 points.push({ x: 1, y: y1 });
-                console.log(`📊 Added logistic boundary: (1, ${y1.toFixed(3)})`);
+                console.log(`📊 Added logistic boundary: (1, ${y1.toFixed(3)}) [raw: ${y1Raw.toFixed(3)}]`);
             }
             
         } catch (error) {

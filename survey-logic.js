@@ -61,76 +61,266 @@ class SurveyLogic {
     }
 
     setTableState(tableId, newData) {
-        // Validate and enforce invariants
-        const validatedData = this.validateAndCorrectTableData(newData);
-        this.tableStates[tableId] = validatedData;
-
+        // Direct assignment - invariants guaranteed by functional operations
+        this.tableStates[tableId] = newData;
+        
         // Trigger UI update for this table
         this.renderTable(tableId);
         this.updateMetalogFromTable(tableId);
     }
 
+    // Legacy wrapper for addRow (now calls clean implementation)
     addTableRow(tableId, x, y) {
-        const currentData = this.getTableState(tableId);
-
-        // Add the new point
-        currentData.push({ x, y });
-
-        // Update state (this will validate and re-render)
-        this.setTableState(tableId, currentData);
+        // Use the clean functional addRow instead
+        this.addRow(tableId);
     }
 
+    // Legacy wrapper for deleteRow (now calls clean implementation)
     removeTableRow(tableId, index) {
-        const currentData = this.getTableState(tableId);
+        // Use the clean functional deleteRow instead
+        this.deleteRow(tableId, index);
+    }
 
-        if (
-            currentData.length > 2 && index >= 0 && index < currentData.length
-        ) {
-            currentData.splice(index, 1);
-            this.setTableState(tableId, currentData);
+    // Legacy function - now handled by clean functional operations
+
+    // =============================================================================
+    // PURE UTILITY FUNCTIONS (following invariants.md specification)
+    // =============================================================================
+
+    // Parse date string to years, return null if invalid
+    parseDate(dateStr) {
+        const result = this.metalogUtils.parseTimeInput(dateStr?.toString().trim());
+        console.log(`🔍 parseDate("${dateStr}") → ${result} years`);
+        return result;
+    }
+
+    // Parse probability string, return null if invalid  
+    parseProb(probStr) {
+        return this.metalogUtils.parseProbabilityInput(probStr?.toString().trim());
+    }
+
+    // Clip value to [min, max] range
+    clipToRange(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    // Convert years to unit space [0,1]
+    convertYearToUnit(years) {
+        const result = this.metalogUtils.timeToNormalized(years);
+        console.log(`🔍 convertYearToUnit(${years}) → ${result} [0,1]`);
+        return result;
+    }
+
+    // Revert cell display to match internal state
+    revertCellDisplay(cell, tableId, rowIndex, field) {
+        const tableData = this.getTableState(tableId);
+        if (rowIndex >= 0 && rowIndex < tableData.length) {
+            const point = tableData[rowIndex];
+            if (field === 'x') {
+                const timeYears = this.metalogUtils.normalizedToTime(point.x);
+                cell.textContent = this.metalogUtils.formatTime(timeYears);
+            } else if (field === 'y') {
+                cell.textContent = (point.y * 100).toFixed(0) + '%';
+            }
+            cell.dataset.originalValue = cell.textContent;
         }
     }
 
-    updateTableCell(tableId, rowIndex, field, value) {
-        const currentData = this.getTableState(tableId);
+    // Find values immediately preceding and following target x
+    findSurroundingValues(tableData, targetX) {
+        let precedingIndex = -1;
+        let followingIndex = -1;
 
-        if (rowIndex >= 0 && rowIndex < currentData.length) {
-            currentData[rowIndex][field] = value;
-            this.setTableState(tableId, currentData);
+        for (let i = 0; i < tableData.length; i++) {
+            if (tableData[i].x < targetX) {
+                precedingIndex = i;
+            } else if (tableData[i].x > targetX && followingIndex === -1) {
+                followingIndex = i;
+                break;
+            }
         }
+
+        return {
+            precedingIndex,
+            followingIndex,
+            precedingValue: precedingIndex >= 0 ? tableData[precedingIndex] : null,
+            followingValue: followingIndex >= 0 ? tableData[followingIndex] : null
+        };
     }
 
-    // Validate and enforce table data invariants
-    validateAndCorrectTableData(data) {
-        if (!Array.isArray(data) || data.length === 0) {
-            return [];
+    // Insert row into table maintaining sort order
+    insertRowSorted(tableData, newPoint) {
+        const result = [...tableData];
+        let insertIndex = 0;
+        
+        // Find insertion point
+        while (insertIndex < result.length && result[insertIndex].x < newPoint.x) {
+            insertIndex++;
+        }
+        
+        result.splice(insertIndex, 0, newPoint);
+        return result;
+    }
+
+    // Check if x-value already exists (accounting for precision)
+    xValueExists(tableData, targetX, precision = 0.001) {
+        return tableData.some(point => Math.abs(point.x - targetX) < precision);
+    }
+
+    // Single function that handles all table updates
+    handleTableUpdate(tableId) {
+        // Trigger UI update and metalog fitting
+        this.renderTable(tableId);
+        this.updateMetalogFromTable(tableId);
+    }
+
+    // =============================================================================
+    // CORE TABLE OPERATIONS (following invariants.md specification)
+    // =============================================================================
+
+    // Change date operation (invariants.md: change date)
+    changeDate(tableId, rowIndex, newDateStr, cell) {
+        // 1. Store row index and old values
+        const tableData = this.getTableState(tableId);
+        if (rowIndex < 0 || rowIndex >= tableData.length) return;
+        
+        const oldPoint = tableData[rowIndex];
+        const { x: xOld, y: yOld } = oldPoint;
+
+        // 2. Attempt to parse new date
+        console.log(`🔍 changeDate() called with: "${newDateStr}"`);
+        const newYears = this.parseDate(newDateStr);
+        console.log(`🔍 changeDate() parsed result: ${newYears} years`);
+        
+        // 3. If parse fails, revert and return
+        if (newYears === null) {
+            console.log(`🔍 changeDate() parse failed, reverting display`);
+            this.revertCellDisplay(cell, tableId, rowIndex, 'x');
+            return;
         }
 
-        // Sort by x
-        const sorted = [...data].sort((a, b) => a.x - b.x);
+        // 4. Clip new date to valid range  
+        const minDate = this.metalogUtils.minTimeYears;
+        const maxDate = 100; // 1 century
+        const clippedYears = this.clipToRange(newYears, minDate, maxDate);
 
-        // Remove duplicates (keep first occurrence of each x value)
-        const unique = [];
-        const seenX = new Set();
+        // 5. Convert to unit space [0,1]
+        const xNew = this.convertYearToUnit(clippedYears);
 
-        for (const point of sorted) {
-            if (!seenX.has(point.x)) {
-                seenX.add(point.x);
-                unique.push({
-                    x: Math.max(0, Math.min(1, point.x)), // Clamp to [0,1]
-                    y: Math.max(0, Math.min(1, point.y)), // Clamp to [0,1]
-                });
-            }
+        // 6. Check if new x already exists
+        const tableWithoutCurrent = [...tableData];
+        tableWithoutCurrent.splice(rowIndex, 1);
+        
+        if (this.xValueExists(tableWithoutCurrent, xNew)) {
+            this.revertCellDisplay(cell, tableId, rowIndex, 'x');
+            return;
         }
 
-        // Enforce monotonic y (CDF property)
-        for (let i = 1; i < unique.length; i++) {
-            if (unique[i].y < unique[i - 1].y) {
-                unique[i].y = unique[i - 1].y; // Make it at least as large as previous
-            }
+        // 7-8. Find surrounding values
+        const surrounding = this.findSurroundingValues(tableWithoutCurrent, xNew);
+        const { precedingValue, followingValue } = surrounding;
+
+        // 9-10. Check y constraints and interpolate if needed
+        let yNew = yOld;
+        const yMin = precedingValue ? precedingValue.y : 0;
+        const yMax = followingValue ? followingValue.y : 1;
+        
+        if (yOld < yMin || yOld > yMax) {
+            yNew = (yMin + yMax) / 2;
         }
 
-        return unique;
+        // 11-12. Create new table with updated point
+        const updatedTable = this.insertRowSorted(tableWithoutCurrent, { x: xNew, y: yNew });
+        this.tableStates[tableId] = updatedTable;
+
+        // 13. Handle everything else
+        this.handleTableUpdate(tableId);
+    }
+
+    // Change probability operation (invariants.md: change prob)
+    changeProb(tableId, rowIndex, newProbStr, cell) {
+        // 1. Attempt to parse probability
+        const newProb = this.parseProb(newProbStr);
+
+        // 2. If parse fails, revert and return
+        if (newProb === null) {
+            this.revertCellDisplay(cell, tableId, rowIndex, 'y');
+            return;
+        }
+
+        const tableData = this.getTableState(tableId);
+        if (rowIndex < 0 || rowIndex >= tableData.length) return;
+
+        // 3. Clip probability to valid range based on neighbors
+        const prevY = rowIndex > 0 ? tableData[rowIndex - 1].y : 0;
+        const nextY = rowIndex < tableData.length - 1 ? tableData[rowIndex + 1].y : 1;
+        const clippedProb = this.clipToRange(newProb, prevY, nextY);
+
+        // 4. Replace state with updated table
+        const updatedTable = [...tableData];
+        updatedTable[rowIndex] = { ...updatedTable[rowIndex], y: clippedProb };
+        this.tableStates[tableId] = updatedTable;
+
+        // 5. Handle everything else
+        this.handleTableUpdate(tableId);
+    }
+
+    // Delete row operation (invariants.md: delete row) 
+    deleteRow(tableId, rowIndex) {
+        const tableData = this.getTableState(tableId);
+
+        // 1. If < 3 datapoints, do nothing
+        if (tableData.length < 3) return;
+
+        // 2. Update state without deleted row
+        const updatedTable = [...tableData];
+        updatedTable.splice(rowIndex, 1);
+        this.tableStates[tableId] = updatedTable;
+
+        // 3. Handle everything else
+        this.handleTableUpdate(tableId);
+    }
+
+    // Add row operation (invariants.md: add row)
+    addRow(tableId) {
+        const tableData = this.getTableState(tableId);
+
+        // 1. If no datapoint at x=1, add it
+        if (!this.xValueExists(tableData, 1.0)) {
+            const updatedTable = this.insertRowSorted(tableData, { x: 1.0, y: 1.0 });
+            this.tableStates[tableId] = updatedTable;
+            this.handleTableUpdate(tableId);
+            return;
+        }
+
+        // 2. If no datapoint at x=0, add it  
+        if (!this.xValueExists(tableData, 0.0)) {
+            const updatedTable = this.insertRowSorted(tableData, { x: 0.0, y: 0.0 });
+            this.tableStates[tableId] = updatedTable;
+            this.handleTableUpdate(tableId);
+            return;
+        }
+
+        // 3. Take middle indices
+        const n = tableData.length;
+        const i = Math.floor(n / 2);
+        const j = i + 1;
+
+        if (j >= n) return; // Safety check
+
+        // 4. Insert midpoint
+        const pointI = tableData[i];
+        const pointJ = tableData[j];
+        const newPoint = {
+            x: (pointI.x + pointJ.x) / 2,
+            y: (pointI.y + pointJ.y) / 2
+        };
+
+        const updatedTable = this.insertRowSorted(tableData, newPoint);
+        this.tableStates[tableId] = updatedTable;
+
+        // 5. Handle everything else
+        this.handleTableUpdate(tableId);
     }
 
     // Render table DOM from state
@@ -374,6 +564,7 @@ class SurveyLogic {
     }
 
     // Smart cell editing with state management
+    // Clean cell editing using new functional approach
     handleCellEdit(cell, tableId) {
         const value = cell.textContent.trim();
         const type = cell.dataset.type;
@@ -393,37 +584,12 @@ class SurveyLogic {
             return;
         }
 
-        const currentData = this.getTableState(tableId);
-        if (rowIndex < 0 || rowIndex >= currentData.length) {
-            console.warn("Invalid row index:", rowIndex);
-            return;
-        }
-
-        let newValue;
-
+        // Route to appropriate clean operation
         if (type === "time") {
-            const timeYears = this.metalogUtils.parseTimeInput(value);
-            if (timeYears === null) {
-                // Invalid format - revert
-                cell.textContent = originalValue;
-                cell.dataset.originalValue = originalValue;
-                return;
-            }
-            newValue = this.metalogUtils.timeToNormalized(timeYears);
-            this.updateTableCell(tableId, rowIndex, "x", newValue);
+            this.changeDate(tableId, rowIndex, value, cell);
         } else if (type === "probability") {
-            const probability = this.metalogUtils.parseProbabilityInput(value);
-            if (probability === null) {
-                // Invalid format - revert
-                cell.textContent = originalValue;
-                cell.dataset.originalValue = originalValue;
-                return;
-            }
-            newValue = probability;
-            this.updateTableCell(tableId, rowIndex, "y", newValue);
+            this.changeProb(tableId, rowIndex, value, cell);
         }
-
-        console.log(`🔄 Updated state: ${type} = ${newValue}`);
     }
 
     updateTableStatus(message, isError = false) {
@@ -437,17 +603,15 @@ class SurveyLogic {
     updateMetalogFromTable(tableId) {
         const tableData = this.getTableState(tableId);
 
-        // Convert normalized data to the format needed for metalog fitting
-        const data = tableData.map((point) => ({
-            x: this.metalogUtils.normalizedToTime(point.x), // Convert back to years for metalog
-            y: point.y,
-        }));
+        // Use data directly in [0,1] space - no conversion needed
+        const data = tableData;
 
-        // Log table update with pairs
+        // Log table update with pairs (convert only for display)
         const pairs = data.map((d) =>
-            `(${this.metalogUtils.formatTime(d.x)}, ${(d.y * 100).toFixed(0)}%)`
+            `(${this.metalogUtils.formatTime(this.metalogUtils.normalizedToTime(d.x))}, ${(d.y * 100).toFixed(0)}%)`
         ).join(", ");
         console.log(`📋 Table updated: ${pairs}`);
+        console.log(`📋 Raw table data [0,1]² space:`, data);
 
         // Clear existing curves
         this.visualizer.svg.selectAll(".s-curve").remove();
@@ -466,7 +630,8 @@ class SurveyLogic {
 
             if (metalog) {
                 console.log("✅ Metalog updated from table data");
-                this.visualizer.drawMetalogCurve(metalog, "Example", 0);
+                console.log("📊 Metalog dataPoints for plotting:", metalog.dataPoints);
+                this.visualizer.drawMetalogCurve(metalog, "Table-based Approach", 0);
                 this.tableBasedData = {
                     type: "metalog",
                     originalData: data,
@@ -482,9 +647,10 @@ class SurveyLogic {
                 const linearData = this.metalogUtils.createPiecewiseLinearData(
                     data,
                 );
+                console.log("📊 Linear interpolation dataPoints for plotting:", linearData);
                 this.visualizer.drawPiecewiseLinearCurve(
                     linearData,
-                    "Example",
+                    "Table-based Approach",
                     0,
                 );
                 this.tableBasedData = {
@@ -526,88 +692,13 @@ class SurveyLogic {
         }
     }
 
+    // UI-facing functions (clean implementations following invariants.md)
     addMetalogRow(tableId) {
-        const currentData = this.getTableState(tableId);
-
-        if (currentData.length === 0) {
-            // First row - start at reasonable point
-            const newX = this.metalogUtils.timeToNormalized(1); // 1 year
-            const newY = 0.5; // 50%
-
-            this.addTableRow(tableId, newX, newY);
-            return;
-        }
-
-        // Check if there's a point at x=1
-        const hasPointAtOne = currentData.some((d) =>
-            Math.abs(d.x - 1.0) < 0.001
-        );
-
-        let newX, newY;
-
-        if (hasPointAtOne) {
-            // Case 1: Point exists at x=1, interpolate between last two points
-            // ((x_{n-1} + x_{n}) / 2, (y_{n-1} + y_{n}) / 2)
-            if (currentData.length >= 2) {
-                const last = currentData[currentData.length - 1];
-                const secondLast = currentData[currentData.length - 2];
-
-                newX = (secondLast.x + last.x) / 2;
-                newY = (secondLast.y + last.y) / 2;
-            } else {
-                // Only one point at x=1, add at middle of range
-                newX = 0.5;
-                newY = 0.5;
-            }
-        } else {
-            // Case 2: No point at x=1, add point at (1, y) where y is from fitted logistic curve
-            newX = 1.0;
-
-            if (currentData.length >= 2) {
-                // Use first and last points to fit logistic curve
-                const first = currentData[0];
-                const last = currentData[currentData.length - 1];
-                newY = this.evaluateLogisticCurve(first, last, newX);
-            } else {
-                // Only one point - simple extrapolation
-                const single = currentData[0];
-                newY = Math.min(0.99, single.y + (1.0 - single.x) * 0.3);
-            }
-        }
-
-        this.addTableRow(tableId, newX, newY);
-    }
-
-    // Fit and evaluate logistic curve: 1/(1 + exp(-s*(x-i)))
-    evaluateLogisticCurve(firstPoint, lastPoint, targetX) {
-        const x1 = firstPoint.x;
-        const y1 = firstPoint.y;
-        const x2 = lastPoint.x;
-        const y2 = lastPoint.y;
-
-        // Prevent division by zero and handle edge cases
-        if (Math.abs(x2 - x1) < 0.001) {
-            return (y1 + y2) / 2;
-        }
-
-        // Convert probabilities to logit space for fitting
-        const logit1 = Math.log(y1 / (1 - y1));
-        const logit2 = Math.log(y2 / (1 - y2));
-
-        // Fit linear relationship in logit space: logit = s*x + c
-        const s = (logit2 - logit1) / (x2 - x1);
-        const c = logit1 - s * x1;
-
-        // Evaluate at target point
-        const targetLogit = s * targetX + c;
-        const targetY = 1 / (1 + Math.exp(-targetLogit));
-
-        // Clamp to valid probability range
-        return Math.max(0.01, Math.min(0.99, targetY));
+        this.addRow(tableId);
     }
 
     removeMetalogRow(tableId, index) {
-        this.removeTableRow(tableId, index);
+        this.deleteRow(tableId, index);
     }
 
     createReviewUI(item, container) {
