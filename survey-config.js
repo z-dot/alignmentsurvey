@@ -46,6 +46,66 @@ const SURVEY_CONFIG = {
         ]
     },
 
+    aiTimelinesCard: {
+        title: "AI Capability Timelines",
+        content: `
+            <p>For each AI capability milestone below, estimate the probability of its development by various time horizons.</p>
+            
+            <p><strong>Consider:</strong> What is the cumulative probability that each capability will be achieved by the specified time?</p>
+            
+            <div style="margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-radius: 8px;">
+                <h4 style="margin-top: 0;">Capability Definitions:</h4>
+                <p><strong>Superhuman coder (SC):</strong> An AI system that can do the job of the best human coder on tasks involved in AI research but faster, and cheaply enough to run lots of copies.</p>
+                <p><strong>Superhuman AI researcher (SAR):</strong> An AI system that can do the job of the best human AI researcher but faster, and cheaply enough to run lots of copies.</p>
+                <p><strong>Superintelligent AI researcher (SIAR):</strong> An AI system that is vastly better than the best human researcher at AI research.</p>
+                <p><strong>Artificial superintelligence (ASI):</strong> An AI system that is much better than the best human at every cognitive task.</p>
+            </div>
+        `,
+        showMultipleTables: true,
+        tables: [
+            {
+                id: "sc-timeline",
+                title: "Superhuman Coder (SC)",
+                defaultData: [
+                    { time: "3 years", probability: "10%" },
+                    { time: "10 years", probability: "30%" },
+                    { time: "25 years", probability: "60%" },
+                    { time: "50 years", probability: "80%" }
+                ]
+            },
+            {
+                id: "sar-timeline", 
+                title: "Superhuman AI Researcher (SAR)",
+                defaultData: [
+                    { time: "5 years", probability: "10%" },
+                    { time: "15 years", probability: "30%" },
+                    { time: "30 years", probability: "60%" },
+                    { time: "50 years", probability: "80%" }
+                ]
+            },
+            {
+                id: "siar-timeline",
+                title: "Superintelligent AI Researcher (SIAR)", 
+                defaultData: [
+                    { time: "10 years", probability: "10%" },
+                    { time: "20 years", probability: "30%" },
+                    { time: "40 years", probability: "60%" },
+                    { time: "75 years", probability: "80%" }
+                ]
+            },
+            {
+                id: "asi-timeline",
+                title: "Artificial Superintelligence (ASI)",
+                defaultData: [
+                    { time: "15 years", probability: "10%" },
+                    { time: "30 years", probability: "30%" },
+                    { time: "50 years", probability: "60%" },
+                    { time: "75 years", probability: "80%" }
+                ]
+            }
+        ]
+    },
+
     approachesTitle: {
         title: "Alignment Approaches",
         content: `

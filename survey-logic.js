@@ -20,6 +20,9 @@ class SurveyLogic {
 
         // Initialize default table states
         this.initializeTableStates();
+        
+        // Initialize multi-table states for timeline cards
+        this.initializeMultiTableStates();
 
         // Store table-based metalog/linear data for export
         this.tableBasedData = null;
@@ -49,6 +52,21 @@ class SurveyLogic {
                 { x: this.metalogUtils.timeToNormalized(10), y: 0.50 },
                 { x: this.metalogUtils.timeToNormalized(50), y: 0.75 },
             ];
+        }
+    }
+
+    // Initialize multi-table states for timeline cards
+    initializeMultiTableStates() {
+        const timelineCard = SURVEY_CONFIG.aiTimelinesCard;
+        if (timelineCard && timelineCard.tables) {
+            timelineCard.tables.forEach(tableConfig => {
+                const normalizedData = tableConfig.defaultData.map(item => ({
+                    x: this.metalogUtils.timeToNormalized(this.metalogUtils.parseTimeInput(item.time)),
+                    y: this.metalogUtils.parseProbabilityInput(item.probability)
+                }));
+                this.tableStates[tableConfig.id] = normalizedData;
+            });
+            console.log("📊 Initialized multi-table states:", Object.keys(this.tableStates).filter(id => id.includes('timeline')));
         }
     }
 
@@ -452,10 +470,15 @@ class SurveyLogic {
                 };
             case 3:
                 return {
+                    type: "aiTimelines", 
+                    item: SURVEY_CONFIG.aiTimelinesCard,
+                };
+            case 4:
+                return {
                     type: "review",
                     item: { title: "Review Your Distribution" },
                 };
-            case 4:
+            case 5:
             default:
                 return { type: "final", item: { title: "Survey Complete" } };
         }
@@ -544,6 +567,9 @@ class SurveyLogic {
             case "metalogTest":
                 this.createMetalogTestCard(currentItem.item, container);
                 break;
+            case "aiTimelines":
+                this.createMetalogTestCard(currentItem.item, container);
+                break;
             case "review":
                 this.createReviewUI(currentItem.item, container);
                 break;
@@ -581,13 +607,19 @@ class SurveyLogic {
                 <h3>${card.title}</h3>
                 ${card.content}
                 ${card.showTable ? this.createMetalogDataTable() : ""}
+                ${card.showMultipleTables ? this.createMultiTableContainer(card) : ""}
             </div>
         `;
 
-        // If we have a table, initialize all tables from state
+        // If we have tables, initialize them from state
         if (card.showTable) {
             setTimeout(() => {
                 this.initializeTables();
+                this.updateVisualization();
+            }, 100);
+        } else if (card.showMultipleTables) {
+            setTimeout(() => {
+                this.initializeMultiTables(card);
                 this.updateVisualization();
             }, 100);
         }
@@ -638,18 +670,59 @@ class SurveyLogic {
         `;
     }
 
+    createMultiTableContainer(card) {
+        return `
+            <div class="multi-tables-container">
+                <h4 style="margin: 20px 0 15px 0;">Timeline Estimates</h4>
+                <div id="multi-tables-list">
+                    <!-- Multiple tables will be dynamically added here -->
+                </div>
+            </div>
+        `;
+    }
+
+    initializeMultiTables(card) {
+        const tablesList = document.getElementById('multi-tables-list');
+        if (!tablesList) return;
+        
+        // Clear existing tables
+        tablesList.innerHTML = '';
+        
+        // Add each configured table
+        card.tables.forEach((tableConfig, index) => {
+            const tableHTML = this.createSingleTable(tableConfig.id, tableConfig.title, false);
+            tablesList.insertAdjacentHTML('beforeend', tableHTML);
+            this.renderTable(tableConfig.id);
+        });
+        
+        console.log(`📊 Initialized ${card.tables.length} timeline tables`);
+    }
+
     // Multiple table management
     addNewTable() {
-        const tableCount = Object.keys(this.tableStates).length;
+        // Get current slide context to determine which tables are relevant
+        const currentItem = this.getCurrentItem();
+        let relevantTableIds = [];
+
+        if (currentItem.type === "metalogTest") {
+            // Only count tables relevant to this slide
+            relevantTableIds = Object.keys(this.tableStates).filter(id => 
+                id === "metalog-test" || id.startsWith("table-")
+            );
+        } else {
+            // Default behavior for other slides
+            relevantTableIds = Object.keys(this.tableStates);
+        }
+
+        const tableCount = relevantTableIds.length;
         const newTableId = `table-${tableCount + 1}`;
         
-        // Get the most recently added table's data to copy from
-        const existingTableIds = Object.keys(this.tableStates);
+        // Get the most recently added relevant table's data to copy from
         let sourceData;
         
-        if (existingTableIds.length > 0) {
-            // Use the last table's data as template
-            const lastTableId = existingTableIds[existingTableIds.length - 1];
+        if (relevantTableIds.length > 0) {
+            // Use the last relevant table's data as template
+            const lastTableId = relevantTableIds[relevantTableIds.length - 1];
             const lastTableData = this.getTableState(lastTableId);
             
             // Copy data but multiply probabilities by 0.75 to make it visually lower
@@ -724,9 +797,23 @@ class SurveyLogic {
         // Clear existing tables
         tablesList.innerHTML = '';
         
-        // Add all tables from state
-        Object.keys(this.tableStates).forEach((tableId, index) => {
-            const canDelete = Object.keys(this.tableStates).length > 1;
+        // Get current slide context to determine which tables to show
+        const currentItem = this.getCurrentItem();
+        let relevantTableIds = [];
+
+        if (currentItem.type === "metalogTest") {
+            // Only show metalog-test and user-added tables
+            relevantTableIds = Object.keys(this.tableStates).filter(id => 
+                id === "metalog-test" || id.startsWith("table-")
+            );
+        } else {
+            // Default: show all tables
+            relevantTableIds = Object.keys(this.tableStates);
+        }
+        
+        // Add only relevant tables from state
+        relevantTableIds.forEach((tableId, index) => {
+            const canDelete = relevantTableIds.length > 1;
             const tableName = tableId === 'metalog-test' ? 'Main Table' : `Table ${index + 1}`;
             const tableHTML = this.createSingleTable(tableId, tableName, canDelete);
             tablesList.insertAdjacentHTML('beforeend', tableHTML);
@@ -776,8 +863,25 @@ class SurveyLogic {
         this.visualizer.svg.selectAll(".s-curve").remove();
         this.visualizer.svg.selectAll("text:not(.axis text)").remove();
 
-        // Render all tables
-        Object.keys(this.tableStates).forEach((tableId, index) => {
+        // Get current slide context to determine which tables to render
+        const currentItem = this.getCurrentItem();
+        let tablesToRender = [];
+
+        if (currentItem.type === "metalogTest") {
+            // Only render the metalog test table
+            tablesToRender = ["metalog-test"];
+        } else if (currentItem.type === "aiTimelines") {
+            // Only render the timeline tables
+            tablesToRender = Object.keys(this.tableStates).filter(id => id.includes('timeline'));
+        } else {
+            // Default: render all tables (for review or other contexts)
+            tablesToRender = Object.keys(this.tableStates);
+        }
+
+        console.log(`📊 Rendering tables for ${currentItem.type}:`, tablesToRender);
+
+        // Render only the relevant tables for this slide
+        tablesToRender.forEach((tableId, index) => {
             const tableData = this.getTableState(tableId);
             
             if (tableData.length >= 2) {
