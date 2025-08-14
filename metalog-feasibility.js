@@ -3,9 +3,6 @@
 
 import { getMetalogBasisValue } from './metalog-core.js';
 
-// Export the main function that metalog-core.js needs
-export { checkMetalogFeasibility };
-
 // =============================================================================
 // MAIN FEASIBILITY CHECKING
 // =============================================================================

@@ -66,7 +66,9 @@ class SurveyLogic {
         
         // Trigger UI update for this table
         this.renderTable(tableId);
-        this.updateMetalogFromTable(tableId);
+        
+        // Update visualization for all tables
+        this.updateVisualization();
     }
 
     // Legacy wrapper for addRow (now calls clean implementation)
@@ -171,7 +173,7 @@ class SurveyLogic {
     handleTableUpdate(tableId) {
         // Trigger UI update and metalog fitting
         this.renderTable(tableId);
-        this.updateMetalogFromTable(tableId);
+        this.updateVisualization();
     }
 
     // =============================================================================
@@ -531,21 +533,35 @@ class SurveyLogic {
             </div>
         `;
 
-        // If we have a table, render it from state
+        // If we have a table, initialize all tables from state
         if (card.showTable) {
             setTimeout(() => {
-                this.renderTable("metalog-test");
-                this.updateMetalogFromTable("metalog-test");
+                this.initializeTables();
+                this.updateVisualization();
             }, 100);
         }
     }
 
     createMetalogDataTable() {
-        const tableId = "metalog-test";
         return `
-            <div class="metalog-table-container">
-                <h4>Data Points</h4>
-                <table class="metalog-data-table" id="metalog-table" data-table-id="${tableId}">
+            <div class="metalog-tables-container">
+                <div id="tables-list">
+                    <!-- Tables will be dynamically added here -->
+                </div>
+                <button class="button" onclick="surveyLogic.addNewTable()" style="margin-top: 10px;">Add Table</button>
+            </div>
+        `;
+    }
+
+    createSingleTable(tableId, tableName = "", canDelete = true) {
+        const displayName = tableName || `Table ${tableId.split('-').pop()}`;
+        return `
+            <div class="metalog-table-container" data-table-container="${tableId}">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4 contenteditable="true" class="table-title" data-table-id="${tableId}">${displayName}</h4>
+                    ${canDelete ? `<button class="remove-btn" onclick="surveyLogic.removeTable('${tableId}')" style="font-size: 14px;">×</button>` : ''}
+                </div>
+                <table class="metalog-data-table" data-table-id="${tableId}">
                     <thead>
                         <tr>
                             <th>Time</th>
@@ -553,14 +569,72 @@ class SurveyLogic {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody id="metalog-table-body">
+                    <tbody>
                         <!-- Rows will be rendered from state -->
                     </tbody>
                 </table>
-                <button class="button" onclick="surveyLogic.addMetalogRow('${tableId}')">Add Row</button>
-                <div id="table-status" style="font-size: 11px; color: #666; margin-top: 5px;"></div>
+                <button class="button" onclick="surveyLogic.addMetalogRow('${tableId}')" style="font-size: 12px; padding: 4px 8px;">Add Row</button>
+                <div class="table-status" style="font-size: 11px; color: #666; margin-top: 5px;"></div>
             </div>
         `;
+    }
+
+    // Multiple table management
+    addNewTable() {
+        const tableCount = Object.keys(this.tableStates).length;
+        const newTableId = `table-${tableCount + 1}`;
+        
+        // Initialize new table with default data
+        this.tableStates[newTableId] = [
+            { x: this.metalogUtils.timeToNormalized(1), y: 0.25 },
+            { x: this.metalogUtils.timeToNormalized(10), y: 0.5 },
+            { x: this.metalogUtils.timeToNormalized(50), y: 0.75 }
+        ];
+        
+        // Add table to DOM
+        const tablesList = document.getElementById('tables-list');
+        if (tablesList) {
+            const newTableHTML = this.createSingleTable(newTableId);
+            tablesList.insertAdjacentHTML('beforeend', newTableHTML);
+            this.renderTable(newTableId);
+            this.updateVisualization();
+        }
+    }
+
+    removeTable(tableId) {
+        // Don't remove if it's the only table
+        if (Object.keys(this.tableStates).length <= 1) {
+            alert("Cannot remove the last remaining table.");
+            return;
+        }
+        
+        // Remove from state
+        delete this.tableStates[tableId];
+        
+        // Remove from DOM
+        const tableContainer = document.querySelector(`[data-table-container="${tableId}"]`);
+        if (tableContainer) {
+            tableContainer.remove();
+        }
+        
+        this.updateVisualization();
+    }
+
+    initializeTables() {
+        const tablesList = document.getElementById('tables-list');
+        if (!tablesList) return;
+        
+        // Clear existing tables
+        tablesList.innerHTML = '';
+        
+        // Add all tables from state
+        Object.keys(this.tableStates).forEach((tableId, index) => {
+            const canDelete = Object.keys(this.tableStates).length > 1;
+            const tableName = tableId === 'metalog-test' ? 'Main Table' : `Table ${index + 1}`;
+            const tableHTML = this.createSingleTable(tableId, tableName, canDelete);
+            tablesList.insertAdjacentHTML('beforeend', tableHTML);
+            this.renderTable(tableId);
+        });
     }
 
     // Smart cell editing with state management
@@ -594,6 +668,57 @@ class SurveyLogic {
 
     updateTableStatus(message, isError = false) {
         const statusDiv = document.getElementById("table-status");
+        if (statusDiv) {
+            statusDiv.textContent = message;
+            statusDiv.style.color = isError ? "#d32f2f" : "#666";
+        }
+    }
+
+    updateVisualization() {
+        // Clear existing curves
+        this.visualizer.svg.selectAll(".s-curve").remove();
+        this.visualizer.svg.selectAll("text:not(.axis text)").remove();
+
+        // Render all tables
+        Object.keys(this.tableStates).forEach((tableId, index) => {
+            const tableData = this.getTableState(tableId);
+            
+            if (tableData.length >= 2) {
+                this.renderTableCurve(tableId, tableData, index);
+            }
+        });
+    }
+
+    renderTableCurve(tableId, data, index) {
+        // Get table display name
+        const titleElement = document.querySelector(`[data-table-id="${tableId}"].table-title`);
+        const tableName = titleElement ? titleElement.textContent.trim() : `Table ${index + 1}`;
+
+        try {
+            console.log(`📈 Rendering curve for ${tableName}:`, data);
+
+            // Use the new modular distribution system directly
+            const distribution = this.metalogUtils.distributionModule.fitDistribution(data);
+            
+            if (distribution.type === 'metalog') {
+                console.log(`✅ ${tableName} - Metalog fitting succeeded`);
+                const plotData = this.metalogUtils.distributionModule.getPlotData(distribution, 200);
+                this.visualizer.drawMetalogCurve(plotData, tableName, index);
+                this.updateTableStatus(tableId, `Metalog fit (k=${distribution.metalog.numTerms})`, false);
+            } else if (distribution.type === 'interpolation') {
+                console.log(`⚠️ ${tableName} - Using interpolation`);
+                this.visualizer.drawPiecewiseLinearCurve(distribution.points, tableName, index);
+                this.updateTableStatus(tableId, "Linear interpolation", false);
+            }
+
+        } catch (error) {
+            console.error(`❌ Error rendering ${tableName}:`, error);
+            this.updateTableStatus(tableId, `Error: ${error.message}`, true);
+        }
+    }
+
+    updateTableStatus(tableId, message, isError = false) {
+        const statusDiv = document.querySelector(`[data-table-container="${tableId}"] .table-status`);
         if (statusDiv) {
             statusDiv.textContent = message;
             statusDiv.style.color = isError ? "#d32f2f" : "#666";

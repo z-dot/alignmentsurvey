@@ -155,9 +155,7 @@ class ChartRenderer {
 
     // === CURVE DRAWING ===
 
-    drawMetalogCurve(metalog, name, index) {
-        const data = this.generateMetalogPlotData(metalog);
-
+    drawMetalogCurve(data, name, index) {
         const line = d3.line()
             .x((d) => this.xScale(d.x))
             .y((d) => this.yScaleApproaches(this.transformY(d.y)))
@@ -170,8 +168,8 @@ class ChartRenderer {
             .attr("clip-path", "url(#chart-area)")
             .style("stroke", this.getColor(index));
 
-        this.addCurveInteractions(curve, name, metalog);
-        this.addCurveLabel(name, index);
+        this.addCurveInteractions(curve, name, { dataPoints: data });
+        this.addCurveLabel(name, index, data);
     }
 
     drawPiecewiseLinearCurve(linearData, name, index) {
@@ -192,7 +190,7 @@ class ChartRenderer {
             name + " (smooth interpolation fallback)",
             { dataPoints: linearData },
         );
-        this.addCurveLabel(name, index);
+        this.addCurveLabel(name, index, linearData);
     }
 
     drawSCurve(approach, index, showTooltip = true) {
@@ -217,35 +215,11 @@ class ChartRenderer {
                 .on("mouseout", () => this.hideTooltip());
         }
 
-        this.addCurveLabel(approach.title, index);
+        this.addCurveLabel(approach.title, index, data);
     }
 
     // === DATA GENERATION ===
 
-    generateMetalogPlotData(metalog) {
-        const numPoints = 200;
-        const data = [];
-
-        // Find safe plotting bounds
-        const dataPoints = metalog.dataPoints;
-        const minDataY = dataPoints[0].y;
-        const maxDataY = dataPoints[dataPoints.length - 1].y;
-
-        const minPlotY = this.findSafePlottingBound(metalog, minDataY, "min");
-        const maxPlotY = this.findSafePlottingBound(metalog, maxDataY, "max");
-
-        // Sample points within the safe range
-        for (let i = 0; i <= numPoints; i++) {
-            const cdfProb = minPlotY + (maxPlotY - minPlotY) * (i / numPoints);
-            const normalizedTime = this.metalogUtils.evaluateMetalog(
-                metalog,
-                cdfProb,
-            );
-            data.push({ x: normalizedTime, y: cdfProb });
-        }
-
-        return data;
-    }
 
     generateSCurveData(approach) {
         const data = [];
@@ -538,10 +512,27 @@ class ChartRenderer {
         return colors[index % colors.length];
     }
 
-    addCurveLabel(text, index) {
+    addCurveLabel(text, index, data = null) {
         const color = this.getColor(index);
-        const x = this.width - 140;
-        const y = 20 + index * 20;
+        
+        let x, y;
+        
+        if (data && data.length > 0) {
+            // Position label at the right end of the curve
+            const lastPoint = data[data.length - 1];
+            x = this.xScale(lastPoint.x) + 10; // 10px padding from line end
+            y = this.yScaleApproaches(this.transformY(lastPoint.y));
+            
+            // Ensure label doesn't go off-screen
+            const labelWidth = text.length * 7; // Rough estimate: 7px per character
+            if (x + labelWidth > this.width) {
+                x = this.width - labelWidth - 5;
+            }
+        } else {
+            // Fallback to original positioning if no data provided
+            x = this.width - 140;
+            y = 20 + index * 20;
+        }
 
         this.svg.append("text")
             .attr("x", x)
