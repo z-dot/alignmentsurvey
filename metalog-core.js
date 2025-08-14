@@ -12,6 +12,9 @@ export function validateMetalogData(data) {
         return { valid: false, error: "Need at least 2 data points" };
     }
     
+    // Sort by probability for boundary checks
+    const sorted = [...data].sort((a, b) => a.y - b.y);
+    
     // Check probabilities are non-decreasing (allow equal values)
     for (let i = 1; i < data.length; i++) {
         if (data[i].y < data[i-1].y) {
@@ -24,6 +27,20 @@ export function validateMetalogData(data) {
         if (data[i].x < 0) {
             return { valid: false, error: "All times must be non-negative" };
         }
+    }
+    
+    // Check for problematic boundary cases
+    const firstPoint = sorted[0];
+    const lastPoint = sorted[sorted.length - 1];
+    
+    // Reject extreme 0% -> 100% cases which are typically infeasible for metalog
+    if (firstPoint.y === 0 && lastPoint.y === 1) {
+        return { valid: false, error: "0% → 100% probability range is typically infeasible for metalog distributions" };
+    }
+    
+    // Check for very steep gradients near boundaries
+    if ((firstPoint.y <= 0.01 || lastPoint.y >= 0.99) && (lastPoint.y - firstPoint.y) > 0.9) {
+        return { valid: false, error: "Extreme probability ranges near boundaries may cause numerical instability" };
     }
     
     return { valid: true };

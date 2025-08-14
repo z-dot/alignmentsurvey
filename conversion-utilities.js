@@ -58,6 +58,10 @@ class ConversionUtils {
         if (cleaned.includes('%')) {
             number = number / 100;
         }
+        // If it's an integer between 1 and 100 (inclusive), treat as percentage
+        else if (Number.isInteger(number) && number >= 1 && number <= 100) {
+            number = number / 100;
+        }
         
         // Clamp to valid probability range
         return Math.max(0, Math.min(1, number));

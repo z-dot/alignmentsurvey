@@ -328,12 +328,10 @@ class SurveyLogic {
     // Render table DOM from state
     renderTable(tableId) {
         const tableData = this.getTableState(tableId);
-        const tbody = document.querySelector(
-            `[data-table-id="${tableId}"] tbody`,
-        );
+        const tbody = document.getElementById(`tbody-${tableId}`);
 
         if (!tbody) {
-            console.warn(`Table with ID ${tableId} not found in DOM`);
+            console.warn(`Table tbody with ID tbody-${tableId} not found in DOM`);
             return;
         }
 
@@ -348,43 +346,96 @@ class SurveyLogic {
 
             const row = document.createElement("tr");
             row.dataset.row = index;
+            row.id = `row-${tableId}-${index}`;
             row.innerHTML = `
-                <td class="time-cell" contenteditable="true" data-type="time">${timeStr}</td>
-                <td class="prob-cell" contenteditable="true" data-type="probability">${probStr}</td>
+                <td class="time-cell" contenteditable="true" data-type="time" id="time-${tableId}-${index}">${timeStr}</td>
+                <td class="prob-cell" contenteditable="true" data-type="probability" id="prob-${tableId}-${index}">${probStr}</td>
                 <td><button class="remove-btn" onclick="surveyLogic.removeMetalogRow('${tableId}', ${index})">×</button></td>
             `;
 
             tbody.appendChild(row);
         });
 
-        // Set up event listeners for all cells
+        // Set up event listeners for all cells and title
         this.setupTableEventListeners(tableId);
+        this.setupTitleEventListeners(tableId);
     }
 
     setupTableEventListeners(tableId) {
-        const table = document.querySelector(`[data-table-id="${tableId}"]`);
-        if (!table) return;
+        const table = document.getElementById(`table-${tableId}`);
+        if (!table) {
+            console.warn(`⚠️ Table table-${tableId} not found for event setup`);
+            return;
+        }
 
         const cells = table.querySelectorAll('[contenteditable="true"]');
+        console.log(`🔧 Setting up event listeners for ${cells.length} cells in table ${tableId}`);
+        
         cells.forEach((cell) => {
             // Store initial value
             cell.dataset.originalValue = cell.textContent;
 
-            cell.addEventListener("focus", (e) => {
+            // Remove any existing event listeners
+            cell.removeEventListener("focus", this._focusHandler);
+            cell.removeEventListener("blur", this._blurHandler);
+            cell.removeEventListener("keydown", this._keydownHandler);
+
+            // Create bound handlers for this specific table
+            const focusHandler = (e) => {
                 e.target.dataset.originalValue = e.target.textContent;
-            });
+            };
 
-            cell.addEventListener("blur", (e) => {
+            const blurHandler = (e) => {
                 this.handleCellEdit(e.target, tableId);
-            });
+            };
 
-            cell.addEventListener("keydown", (e) => {
+            const keydownHandler = (e) => {
                 if (e.key === "Enter") {
                     e.preventDefault();
                     e.target.blur();
                 }
-            });
+            };
+
+            // Add event listeners
+            cell.addEventListener("focus", focusHandler);
+            cell.addEventListener("blur", blurHandler);
+            cell.addEventListener("keydown", keydownHandler);
         });
+    }
+
+    setupTitleEventListeners(tableId) {
+        const titleElement = document.getElementById(`title-${tableId}`);
+        if (!titleElement) return;
+
+        // Store initial value
+        titleElement.dataset.originalValue = titleElement.textContent;
+
+        const focusHandler = (e) => {
+            e.target.dataset.originalValue = e.target.textContent;
+        };
+
+        const blurHandler = (e) => {
+            // Title changes are saved automatically on blur
+            console.log(`📝 Title changed to: ${e.target.textContent}`);
+            // Redraw visualization to update chart labels immediately
+            this.updateVisualization();
+        };
+
+        const keydownHandler = (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                e.target.blur(); // This will trigger the save
+            }
+            if (e.key === "Escape") {
+                e.target.textContent = e.target.dataset.originalValue;
+                e.target.blur();
+            }
+        };
+
+        // Add event listeners
+        titleElement.addEventListener("focus", focusHandler);
+        titleElement.addEventListener("blur", blurHandler);
+        titleElement.addEventListener("keydown", keydownHandler);
     }
 
     // Survey navigation
@@ -545,10 +596,11 @@ class SurveyLogic {
     createMetalogDataTable() {
         return `
             <div class="metalog-tables-container">
+                <h4 style="margin: 0 0 15px 0;">Data Tables</h4>
                 <div id="tables-list">
                     <!-- Tables will be dynamically added here -->
                 </div>
-                <button class="button" onclick="surveyLogic.addNewTable()" style="margin-top: 10px;">Add Table</button>
+                <button class="button" onclick="surveyLogic.addNewTable()" style="background-color: #2A623D; padding: 8px 16px; margin-top: 15px;">+ Add Table</button>
             </div>
         `;
     }
@@ -556,25 +608,32 @@ class SurveyLogic {
     createSingleTable(tableId, tableName = "", canDelete = true) {
         const displayName = tableName || `Table ${tableId.split('-').pop()}`;
         return `
-            <div class="metalog-table-container" data-table-container="${tableId}">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h4 contenteditable="true" class="table-title" data-table-id="${tableId}">${displayName}</h4>
-                    ${canDelete ? `<button class="remove-btn" onclick="surveyLogic.removeTable('${tableId}')" style="font-size: 14px;">×</button>` : ''}
+            <div class="metalog-table-container" data-table-container="${tableId}" style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px; background-color: #fafafa;">
+                <div class="table-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer;" onclick="surveyLogic.toggleTableCollapse('${tableId}')">
+                    <div style="display: flex; align-items: center;">
+                        <span class="collapse-indicator" id="collapse-${tableId}" style="margin-right: 8px; font-weight: bold; color: #666;">▼</span>
+                        <h4 contenteditable="true" class="table-title" data-table-id="${tableId}" id="title-${tableId}" style="margin: 0;" onclick="event.stopPropagation()">${displayName}</h4>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        ${canDelete ? `<button class="remove-btn" onclick="event.stopPropagation(); surveyLogic.removeTable('${tableId}')" style="font-size: 16px; background: none; border: none; color: #f44336; cursor: pointer; padding: 4px;">×</button>` : ''}
+                    </div>
                 </div>
-                <table class="metalog-data-table" data-table-id="${tableId}">
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>Probability</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Rows will be rendered from state -->
-                    </tbody>
-                </table>
-                <button class="button" onclick="surveyLogic.addMetalogRow('${tableId}')" style="font-size: 12px; padding: 4px 8px;">Add Row</button>
-                <div class="table-status" style="font-size: 11px; color: #666; margin-top: 5px;"></div>
+                <div class="table-content" id="content-${tableId}">
+                    <table class="metalog-data-table" data-table-id="${tableId}" id="table-${tableId}">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Probability</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-${tableId}">
+                            <!-- Rows will be rendered from state -->
+                        </tbody>
+                    </table>
+                    <button class="button" onclick="surveyLogic.addMetalogRow('${tableId}')" style="font-size: 12px; padding: 4px 8px; margin-top: 8px;">Add Row</button>
+                    <div class="table-status" style="font-size: 11px; color: #666; margin-top: 5px;"></div>
+                </div>
             </div>
         `;
     }
@@ -584,12 +643,33 @@ class SurveyLogic {
         const tableCount = Object.keys(this.tableStates).length;
         const newTableId = `table-${tableCount + 1}`;
         
-        // Initialize new table with default data
-        this.tableStates[newTableId] = [
-            { x: this.metalogUtils.timeToNormalized(1), y: 0.25 },
-            { x: this.metalogUtils.timeToNormalized(10), y: 0.5 },
-            { x: this.metalogUtils.timeToNormalized(50), y: 0.75 }
-        ];
+        // Get the most recently added table's data to copy from
+        const existingTableIds = Object.keys(this.tableStates);
+        let sourceData;
+        
+        if (existingTableIds.length > 0) {
+            // Use the last table's data as template
+            const lastTableId = existingTableIds[existingTableIds.length - 1];
+            const lastTableData = this.getTableState(lastTableId);
+            
+            // Copy data but multiply probabilities by 0.75 to make it visually lower
+            sourceData = lastTableData.map(point => ({
+                x: point.x, // Keep same time values
+                y: Math.min(point.y * 0.75, 0.99) // Reduce probability by 25%, cap at 99%
+            }));
+            
+            console.log(`📊 Creating new table based on ${lastTableId} with probabilities * 0.75`);
+        } else {
+            // Fallback to default data if no tables exist
+            sourceData = [
+                { x: this.metalogUtils.timeToNormalized(1), y: 0.25 },
+                { x: this.metalogUtils.timeToNormalized(10), y: 0.5 },
+                { x: this.metalogUtils.timeToNormalized(50), y: 0.75 }
+            ];
+        }
+        
+        // Initialize new table with copied/modified data
+        this.tableStates[newTableId] = sourceData;
         
         // Add table to DOM
         const tablesList = document.getElementById('tables-list');
@@ -618,6 +698,23 @@ class SurveyLogic {
         }
         
         this.updateVisualization();
+    }
+
+    toggleTableCollapse(tableId) {
+        const content = document.getElementById(`content-${tableId}`);
+        const indicator = document.getElementById(`collapse-${tableId}`);
+        
+        if (!content || !indicator) return;
+        
+        if (content.style.display === 'none') {
+            // Expand
+            content.style.display = 'block';
+            indicator.textContent = '▼';
+        } else {
+            // Collapse
+            content.style.display = 'none';
+            indicator.textContent = '►';
+        }
     }
 
     initializeTables() {

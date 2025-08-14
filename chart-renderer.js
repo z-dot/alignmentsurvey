@@ -427,7 +427,12 @@ class ChartRenderer {
 
             // Update everything
             this.updateYAxisWithAnimation();
-            this.updateVisualization();
+            // Trigger survey logic visualization update for tables
+            if (this.surveyLogic && typeof this.surveyLogic.updateVisualization === 'function') {
+                this.surveyLogic.updateVisualization();
+            } else {
+                this.updateVisualization(); // Fallback for non-table visualizations
+            }
 
             if (progress < 1) {
                 requestAnimationFrame(animate);
@@ -435,7 +440,12 @@ class ChartRenderer {
                 // Animation complete
                 this.currentExponent = endExponent;
                 this.updateYAxisWithAnimation();
-                this.updateVisualization();
+                // Trigger final update
+                if (this.surveyLogic && typeof this.surveyLogic.updateVisualization === 'function') {
+                    this.surveyLogic.updateVisualization();
+                } else {
+                    this.updateVisualization(); // Fallback for non-table visualizations
+                }
             }
         };
 
@@ -514,24 +524,58 @@ class ChartRenderer {
 
     addCurveLabel(text, index, data = null) {
         const color = this.getColor(index);
+        const fontSize = 12; // Base font size
+        const fontSizeEm = fontSize / 16; // Convert to em for calculations
         
         let x, y;
         
         if (data && data.length > 0) {
-            // Position label at the right end of the curve
+            // Position label to the right of the chart area (beyond x=1)
             const lastPoint = data[data.length - 1];
-            x = this.xScale(lastPoint.x) + 10; // 10px padding from line end
-            y = this.yScaleApproaches(this.transformY(lastPoint.y));
+            const rightEdgeX = this.xScale(1); // Right edge of chart (x=1)
+            const baseY = this.yScaleApproaches(this.transformY(lastPoint.y));
             
-            // Ensure label doesn't go off-screen
-            const labelWidth = text.length * 7; // Rough estimate: 7px per character
-            if (x + labelWidth > this.width) {
-                x = this.width - labelWidth - 5;
+            console.log(`📍 Label "${text}": lastPoint=`, lastPoint, `rightEdgeX=${rightEdgeX}, baseY=${baseY}`);
+            
+            // Dynamic spacing based on font size
+            const horizontalPadding = fontSize * 1.5; // Increase padding to push labels further right
+            const estimatedCharWidth = fontSize * 0.6;
+            const labelWidth = text.length * estimatedCharWidth;
+            
+            // Position label to the right of the chart with proper spacing
+            x = rightEdgeX + horizontalPadding;
+            y = baseY;
+            
+            console.log(`📍 Initial position for "${text}": x=${x}, y=${y}`);
+            
+            // Simple collision avoidance - stack labels vertically if they would overlap horizontally
+            const existingLabels = this.svg.selectAll("text:not(.axis text)");
+            const verticalSpacing = fontSize * 2; // Increased spacing
+            let yOffset = 0;
+            
+            existingLabels.each(function() {
+                const existingLabel = d3.select(this);
+                const existingY = parseFloat(existingLabel.attr("y"));
+                const existingX = parseFloat(existingLabel.attr("x"));
+                
+                // Check if this label would overlap with existing label
+                if (Math.abs(existingX - x) < labelWidth && Math.abs(existingY - (y + yOffset)) < verticalSpacing) {
+                    yOffset += verticalSpacing; // Stack below
+                }
+            });
+            
+            y = y + yOffset;
+            console.log(`📍 Final position for "${text}": x=${x}, y=${y} (yOffset=${yOffset})`);
+            
+            // Ensure doesn't go off bottom of chart
+            if (y > this.height - fontSize) {
+                y = this.height - fontSize;
             }
         } else {
-            // Fallback to original positioning if no data provided
-            x = this.width - 140;
-            y = 20 + index * 20;
+            // Fallback to stacked positioning if no data provided
+            const verticalSpacing = fontSize * 1.5;
+            x = this.width - (fontSize * 10); // ~10em from right edge
+            y = (fontSize * 2) + (index * verticalSpacing); // Start at 2em from top
         }
 
         this.svg.append("text")
@@ -539,7 +583,7 @@ class ChartRenderer {
             .attr("y", y)
             .attr("dy", "0.35em")
             .style("fill", color)
-            .style("font-size", "12px")
+            .style("font-size", `${fontSize}px`)
             .style("font-weight", "bold")
             .text(text);
     }

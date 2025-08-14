@@ -1,7 +1,7 @@
 // Metalog Feasibility Checking - Algorithm 1 from SSRN paper
 // Air-tight feasibility checking using polynomial root finding
 
-import { getMetalogBasisValue } from './metalog-core.js';
+import { getMetalogBasisValue, evaluateMetalog } from './metalog-core.js';
 
 // =============================================================================
 // MAIN FEASIBILITY CHECKING
@@ -114,11 +114,14 @@ function constructInflectionPolynomial(metalog, i) {
     if (k === 5 && i === 3) {
         // From Table 2: degree 2 polynomial
         const a2 = coefficients[1], a3 = coefficients[2], a6 = coefficients[4];
-        return [
+        const polynomial = [
             2*a2 - a3 + 0.5*a6,                    // constant
             -6*a2 + 2*a3 - 0.5*a6,                 // linear  
             6*a2 + 0.5*a6                          // quadratic
         ];
+        console.log(`📊 k=5 polynomial coefficients: a2=${a2.toFixed(4)}, a3=${a3.toFixed(4)}, a6=${a6.toFixed(4)}`);
+        console.log(`📊 k=5 polynomial: [${polynomial.map(c => c.toFixed(6)).join(', ')}]`);
+        return polynomial;
     }
     
     if (k === 6 && i === 3) {
@@ -162,16 +165,28 @@ function findPolynomialRootsInInterval(coeffs, a, b) {
 }
 
 function solveQuadratic(a, b, c) {
+    console.log(`🔧 Solving quadratic: ${a.toFixed(6)}x² + ${b.toFixed(6)}x + ${c.toFixed(6)} = 0`);
+    
     if (Math.abs(a) < 1e-12) {
         // Linear case
-        return Math.abs(b) > 1e-12 ? [-c / b] : [];
+        console.log(`📊 Linear case: ${b.toFixed(6)}x + ${c.toFixed(6)} = 0`);
+        const root = Math.abs(b) > 1e-12 ? [-c / b] : [];
+        console.log(`📊 Linear roots:`, root);
+        return root;
     }
     
     const discriminant = b * b - 4 * a * c;
-    if (discriminant < 0) return [];
+    console.log(`📊 Discriminant: ${b.toFixed(6)}² - 4(${a.toFixed(6)})(${c.toFixed(6)}) = ${discriminant.toFixed(6)}`);
+    
+    if (discriminant < 0) {
+        console.log(`📊 No real roots (negative discriminant)`);
+        return [];
+    }
     
     const sqrtD = Math.sqrt(discriminant);
-    return [(-b + sqrtD) / (2 * a), (-b - sqrtD) / (2 * a)];
+    const roots = [(-b + sqrtD) / (2 * a), (-b - sqrtD) / (2 * a)];
+    console.log(`📊 Quadratic roots: [${roots.map(r => r.toFixed(6)).join(', ')}]`);
+    return roots;
 }
 
 function numericalRootFinding(coeffs, a, b) {
@@ -287,7 +302,69 @@ function numericalPolynomialApproximation(metalog, i) {
 }
 
 function checkTailFeasibility(metalog) {
-    // Simplified tail feasibility check
-    console.log("✅ Tail feasibility conditions satisfied (simplified)");
+    console.log("🔬 Checking tail feasibility conditions");
+    
+    const coefficients = metalog.coefficients;
+    const k = metalog.numTerms;
+    
+    // For metalog distributions, we need to check that the quantile function
+    // behaves properly at the boundaries (y → 0+ and y → 1-)
+    
+    // Check lower tail behavior (y → 0+)
+    try {
+        const lowerTailSlope = evaluateMetalogDerivative(metalog, 0.001);
+        console.log(`📊 Lower tail slope (y=0.001): M'(y)=${lowerTailSlope.toFixed(8)}`);
+        
+        if (lowerTailSlope < 0) {
+            console.log("❌ Tail feasibility failed: negative slope in lower tail");
+            return false;
+        }
+        
+        if (!isFinite(lowerTailSlope)) {
+            console.log("❌ Tail feasibility failed: infinite slope in lower tail");
+            return false;
+        }
+    } catch (error) {
+        console.log("❌ Tail feasibility failed: error evaluating lower tail:", error.message);
+        return false;
+    }
+    
+    // Check upper tail behavior (y → 1-)
+    try {
+        const upperTailSlope = evaluateMetalogDerivative(metalog, 0.999);
+        console.log(`📊 Upper tail slope (y=0.999): M'(y)=${upperTailSlope.toFixed(8)}`);
+        
+        if (upperTailSlope < 0) {
+            console.log("❌ Tail feasibility failed: negative slope in upper tail");
+            return false;
+        }
+        
+        if (!isFinite(upperTailSlope)) {
+            console.log("❌ Tail feasibility failed: infinite slope in upper tail");
+            return false;
+        }
+    } catch (error) {
+        console.log("❌ Tail feasibility failed: error evaluating upper tail:", error.message);
+        return false;
+    }
+    
+    // Additional check: ensure the distribution is bounded
+    // (This is a simplified version - full implementation would check convergence)
+    try {
+        const extremeLeft = evaluateMetalog(metalog, 0.0001);
+        const extremeRight = evaluateMetalog(metalog, 0.9999);
+        
+        if (!isFinite(extremeLeft) || !isFinite(extremeRight)) {
+            console.log("❌ Tail feasibility failed: distribution is unbounded");
+            return false;
+        }
+        
+        console.log(`📊 Extreme values: M(0.0001)=${extremeLeft.toFixed(6)}, M(0.9999)=${extremeRight.toFixed(6)}`);
+    } catch (error) {
+        console.log("❌ Tail feasibility failed: error evaluating extreme values:", error.message);
+        return false;
+    }
+    
+    console.log("✅ Tail feasibility conditions satisfied");
     return true;
 }
