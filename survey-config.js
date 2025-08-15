@@ -67,40 +67,84 @@ const SURVEY_CONFIG = {
                 id: "sc-timeline",
                 title: "Superhuman Coder (SC)",
                 defaultData: [
-                    { time: "3 years", probability: "10%" },
-                    { time: "10 years", probability: "30%" },
-                    { time: "25 years", probability: "60%" },
-                    { time: "50 years", probability: "80%" }
+                    { time: "2028", probability: "10%" },
+                    { time: "2035", probability: "30%" },
+                    { time: "2050", probability: "60%" },
+                    { time: "2065", probability: "80%" }
                 ]
             },
             {
                 id: "sar-timeline", 
                 title: "Superhuman AI Researcher (SAR)",
                 defaultData: [
-                    { time: "5 years", probability: "10%" },
-                    { time: "15 years", probability: "30%" },
-                    { time: "30 years", probability: "60%" },
-                    { time: "50 years", probability: "80%" }
+                    { time: "2030", probability: "10%" },
+                    { time: "2040", probability: "30%" },
+                    { time: "2055", probability: "60%" },
+                    { time: "2065", probability: "80%" }
                 ]
             },
             {
                 id: "siar-timeline",
                 title: "Superintelligent AI Researcher (SIAR)", 
                 defaultData: [
-                    { time: "10 years", probability: "10%" },
-                    { time: "20 years", probability: "30%" },
-                    { time: "40 years", probability: "60%" },
-                    { time: "75 years", probability: "80%" }
+                    { time: "2035", probability: "10%" },
+                    { time: "2045", probability: "30%" },
+                    { time: "2060", probability: "60%" },
+                    { time: "2065", probability: "80%" }
                 ]
             },
             {
                 id: "asi-timeline",
                 title: "Artificial Superintelligence (ASI)",
                 defaultData: [
-                    { time: "15 years", probability: "10%" },
-                    { time: "30 years", probability: "30%" },
-                    { time: "50 years", probability: "60%" },
-                    { time: "75 years", probability: "80%" }
+                    { time: "2040", probability: "10%" },
+                    { time: "2050", probability: "30%" },
+                    { time: "2060", probability: "60%" },
+                    { time: "2065", probability: "80%" }
+                ]
+            }
+        ]
+    },
+
+    // P(doom) and P(misalignment) assessment based on AI 2027 scenario
+    doomAssessmentCard: {
+        title: "P(doom) and P(misalignment) Assessment",
+        content: `
+            <div class="info-card">
+                <h4>AI 2027 Scenario Context</h4>
+                <p>Consider the <a href="https://ai-2027.com/#narrative-2027-09-30" target="_blank">AI 2027 scenario</a> as described in the narrative through September 2027. You are now making assessments conditioning on the observations about alignment, capabilities, governance, and other factors described in that scenario.</p>
+                
+                <h4>Assessment Question</h4>
+                <p><strong>If humanity were to "burn the lead" for X amount of time</strong> (meaning we continue developing AI capabilities without substantially improving alignment or governance), what are your probability assessments for the following outcomes?</p>
+                
+                <h4>Definitions</h4>
+                <p><strong>P(doom):</strong> Probability that humanity faces existential catastrophe or permanent disempowerment due to AI.</p>
+                
+                <p><strong>P(misalignment):</strong> Probability that we end up in the "second attractor state" where AIs are pretending to be aligned but are actually growing in power and subverting the system, while humans mistakenly believe they are in control.</p>
+                
+                <p><em>Note: P(misalignment) may be higher than P(doom) since misalignment doesn't necessarily lead to doom, but doom typically requires misalignment.</em></p>
+            </div>
+        `,
+        showMultipleTables: true,
+        tables: [
+            {
+                id: "doom-assessment",
+                title: "P(doom)",
+                defaultData: [
+                    { time: "1 month", probability: "5%" },
+                    { time: "6 months", probability: "15%" },
+                    { time: "2 years", probability: "35%" },
+                    { time: "10 years", probability: "60%" }
+                ]
+            },
+            {
+                id: "misalignment-assessment", 
+                title: "P(misalignment)",
+                defaultData: [
+                    { time: "1 month", probability: "15%" },
+                    { time: "6 months", probability: "35%" },
+                    { time: "2 years", probability: "60%" },
+                    { time: "10 years", probability: "80%" }
                 ]
             }
         ]

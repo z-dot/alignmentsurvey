@@ -55,6 +55,25 @@ class ChartRenderer {
         this.createAxes();
     }
 
+    // Determine if current slide should use linear year axis
+    shouldUseLinearYearAxis() {
+        const currentItem = this.surveyLogic?.getCurrentItem();
+        return currentItem?.type === "aiTimelines";
+    }
+
+    // Linear year conversion functions for timeline slides
+    yearToNormalized(year) {
+        const currentYear = 2025;
+        const maxYear = 2065;
+        return Math.max(0, Math.min(1, (year - currentYear) / (maxYear - currentYear)));
+    }
+
+    normalizedToYear(normalized) {
+        const currentYear = 2025;
+        const maxYear = 2065;
+        return currentYear + normalized * (maxYear - currentYear);
+    }
+
     createAxes() {
         // Time ticks for x-axis
         const timeTicks = this.getTimeTicks();
@@ -99,6 +118,11 @@ class ChartRenderer {
     }
 
     getTimeTicks() {
+        if (this.shouldUseLinearYearAxis()) {
+            return this.getLinearYearTicks();
+        }
+        
+        // Original logarithmic time ticks
         const oneDayInYears = 1 / 365.25;
         const oneWeekInYears = 7 / 365.25;
         const oneMonthInYears = 1 / 12;
@@ -151,6 +175,21 @@ class ChartRenderer {
                 position: this.metalogUtils.timeToNormalized(oneCenturyInYears),
             },
         ];
+    }
+
+    getLinearYearTicks() {
+        // Linear year ticks for timeline slides (2025-2065) with 5-year intervals
+        const currentYear = 2025;
+        const maxYear = 2065;
+        const yearRange = maxYear - currentYear; // 40 years
+        
+        const years = [2025, 2030, 2035, 2040, 2045, 2050, 2055, 2060, 2065];
+        
+        return years.map(year => ({
+            years: year - currentYear, // Convert to years from 2025
+            label: year.toString(),
+            position: (year - currentYear) / yearRange // Linear position [0,1]
+        }));
     }
 
     // === CURVE DRAWING ===
@@ -314,8 +353,19 @@ class ChartRenderer {
         const normalizedTime = this.xScale.invert(mouseX);
         const transformedProb = this.yScaleApproaches.invert(mouseY);
         const probability = this.inverseTransformY(transformedProb);
-        const timeInYears = this.metalogUtils.normalizedToTime(normalizedTime);
-        const timeStr = this.metalogUtils.formatTime(timeInYears);
+        
+        let timeStr;
+        if (this.shouldUseLinearYearAxis()) {
+            // Linear year mode: convert normalized position to year
+            const currentYear = 2025;
+            const maxYear = 2065;
+            const year = currentYear + normalizedTime * (maxYear - currentYear);
+            timeStr = Math.round(year).toString();
+        } else {
+            // Log time mode: use existing conversion
+            const timeInYears = this.metalogUtils.normalizedToTime(normalizedTime);
+            timeStr = this.metalogUtils.formatTime(timeInYears);
+        }
 
         const tooltip = document.getElementById("tooltip");
         tooltip.innerHTML = `
@@ -335,6 +385,9 @@ class ChartRenderer {
         // Clear existing curves and labels
         this.svg.selectAll(".s-curve").remove();
         this.svg.selectAll("text:not(.axis text)").remove();
+        
+        // Update axes for context-aware rendering
+        this.updateAxesForCurrentContext();
 
         const currentItem = this.surveyLogic.getCurrentItem();
 
@@ -360,10 +413,47 @@ class ChartRenderer {
                     }
                 }
                 break;
+            case "aiTimelines":
+                this.drawTimelineVisualization();
+                break;
             case "approach":
                 this.drawApproachVisualization(currentItem.item);
                 break;
         }
+    }
+
+    updateAxesForCurrentContext() {
+        // Remove existing x-axis and grid
+        this.svg.selectAll(".x-axis").remove();
+        this.svg.selectAll(".grid").remove();
+        
+        // Redraw x-axis with context-appropriate ticks
+        const timeTicks = this.getTimeTicks();
+        const xAxis = d3.axisBottom(this.xScale)
+            .tickValues(timeTicks.map((d) => d.position))
+            .tickFormat((d, i) => timeTicks[i].label);
+
+        this.svg.append("g")
+            .attr("class", "axis x-axis")
+            .attr("transform", `translate(0,${this.splitY})`)
+            .call(xAxis);
+        
+        // Redraw grid lines with context-appropriate ticks
+        const xGrid = d3.axisBottom(this.xScale)
+            .tickValues(timeTicks.map((d) => d.position))
+            .tickSize(-this.height)
+            .tickFormat("");
+
+        this.svg.append("g")
+            .attr("class", "grid")
+            .attr("transform", `translate(0,${this.splitY})`)
+            .call(xGrid);
+    }
+
+    drawTimelineVisualization() {
+        // This will be implemented to show multiple timeline curves
+        // For now, delegate to surveyLogic to handle multiple tables
+        // The curves will be drawn by the table update system
     }
 
     drawExampleVisualization() {

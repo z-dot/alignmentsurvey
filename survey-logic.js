@@ -8,7 +8,6 @@ class SurveyLogic {
 
         // Survey state
         this.currentStep = 0;
-        this.totalSteps = 5; // intro + example + metalog test + review + final
         this.completedSteps = new Set();
         this.hasInteracted = false;
         this.everCompleted = new Set(); // Track items that have been completed at least once
@@ -23,6 +22,9 @@ class SurveyLogic {
         
         // Initialize multi-table states for timeline cards
         this.initializeMultiTableStates();
+        
+        // Initialize multi-table states for doom assessment cards  
+        this.initializeDoomAssessmentStates();
 
         // Store table-based metalog/linear data for export
         this.tableBasedData = null;
@@ -60,14 +62,54 @@ class SurveyLogic {
         const timelineCard = SURVEY_CONFIG.aiTimelinesCard;
         if (timelineCard && timelineCard.tables) {
             timelineCard.tables.forEach(tableConfig => {
-                const normalizedData = tableConfig.defaultData.map(item => ({
-                    x: this.metalogUtils.timeToNormalized(this.metalogUtils.parseTimeInput(item.time)),
-                    y: this.metalogUtils.parseProbabilityInput(item.probability)
-                }));
+                const normalizedData = tableConfig.defaultData.map(item => {
+                    const timeYears = this.metalogUtils.parseTimeInput(item.time);
+                    // Use linear year normalization for timeline tables (timeYears is already absolute year)
+                    const normalizedX = this.yearToNormalized(timeYears);
+                    
+                    return {
+                        x: normalizedX,
+                        y: this.metalogUtils.parseProbabilityInput(item.probability)
+                    };
+                });
                 this.tableStates[tableConfig.id] = normalizedData;
             });
             console.log("📊 Initialized multi-table states:", Object.keys(this.tableStates).filter(id => id.includes('timeline')));
         }
+    }
+
+    // Initialize multi-table states for doom assessment cards
+    initializeDoomAssessmentStates() {
+        const doomCard = SURVEY_CONFIG.doomAssessmentCard;
+        if (doomCard && doomCard.tables) {
+            doomCard.tables.forEach(tableConfig => {
+                const normalizedData = tableConfig.defaultData.map(item => {
+                    const timeYears = this.metalogUtils.parseTimeInput(item.time);
+                    // Use logarithmic time normalization for doom assessment (like metalog test)
+                    const normalizedX = this.metalogUtils.timeToNormalized(timeYears);
+                    
+                    return {
+                        x: normalizedX,
+                        y: this.metalogUtils.parseProbabilityInput(item.probability)
+                    };
+                });
+                this.tableStates[tableConfig.id] = normalizedData;
+            });
+            console.log("📊 Initialized doom assessment states:", Object.keys(this.tableStates).filter(id => id.includes('assessment')));
+        }
+    }
+
+    // Linear year conversion functions for timeline tables
+    yearToNormalized(year) {
+        const currentYear = 2025;
+        const maxYear = 2065;
+        return Math.max(0, Math.min(1, (year - currentYear) / (maxYear - currentYear)));
+    }
+
+    normalizedToYear(normalized) {
+        const currentYear = 2025;
+        const maxYear = 2065;
+        return currentYear + normalized * (maxYear - currentYear);
     }
 
     // Core table state management methods
@@ -126,9 +168,20 @@ class SurveyLogic {
 
     // Convert years to unit space [0,1]
     convertYearToUnit(years) {
-        const result = this.metalogUtils.timeToNormalized(years);
-        console.log(`🔍 convertYearToUnit(${years}) → ${result} [0,1]`);
-        return result;
+        // Determine conversion method based on current slide context
+        const currentItem = this.getCurrentItem();
+        
+        if (currentItem?.type === "aiTimelines") {
+            // For timeline slides, treat input as absolute years (e.g., "2030" → year 2030)
+            const result = this.yearToNormalized(years);
+            console.log(`🔍 convertYearToUnit(${years}) → ${result} [0,1] (linear year mode)`);
+            return result;
+        } else {
+            // For other slides, use logarithmic time conversion
+            const result = this.metalogUtils.timeToNormalized(years);
+            console.log(`🔍 convertYearToUnit(${years}) → ${result} [0,1] (log time mode)`);
+            return result;
+        }
     }
 
     // Revert cell display to match internal state
@@ -137,8 +190,17 @@ class SurveyLogic {
         if (rowIndex >= 0 && rowIndex < tableData.length) {
             const point = tableData[rowIndex];
             if (field === 'x') {
-                const timeYears = this.metalogUtils.normalizedToTime(point.x);
-                cell.textContent = this.metalogUtils.formatTime(timeYears);
+                const currentItem = this.getCurrentItem();
+                
+                if (currentItem?.type === "aiTimelines") {
+                    // For timeline slides, show as absolute year
+                    const year = this.normalizedToYear(point.x);
+                    cell.textContent = Math.round(year).toString();
+                } else {
+                    // For other slides, use logarithmic time format
+                    const timeYears = this.metalogUtils.normalizedToTime(point.x);
+                    cell.textContent = this.metalogUtils.formatTime(timeYears);
+                }
             } else if (field === 'y') {
                 cell.textContent = (point.y * 100).toFixed(0) + '%';
             }
@@ -220,9 +282,20 @@ class SurveyLogic {
         }
 
         // 4. Clip new date to valid range  
-        const minDate = this.metalogUtils.minTimeYears;
-        const maxDate = 100; // 1 century
-        const clippedYears = this.clipToRange(newYears, minDate, maxDate);
+        const currentItem = this.getCurrentItem();
+        let minDate, maxDate, clippedYears;
+        
+        if (currentItem?.type === "aiTimelines") {
+            // Timeline slides: range is 2025-2065
+            minDate = 2025;
+            maxDate = 2065;
+            clippedYears = this.clipToRange(newYears, minDate, maxDate);
+        } else {
+            // Other slides: use logarithmic time range
+            minDate = this.metalogUtils.minTimeYears;
+            maxDate = 100; // 1 century
+            clippedYears = this.clipToRange(newYears, minDate, maxDate);
+        }
 
         // 5. Convert to unit space [0,1]
         const xNew = this.convertYearToUnit(clippedYears);
@@ -358,8 +431,19 @@ class SurveyLogic {
 
         // Render rows from state
         tableData.forEach((point, index) => {
-            const timeYears = this.metalogUtils.normalizedToTime(point.x);
-            const timeStr = this.metalogUtils.formatTime(timeYears);
+            const currentItem = this.getCurrentItem();
+            let timeStr;
+            
+            if (currentItem?.type === "aiTimelines") {
+                // For timeline slides, show as absolute year
+                const year = this.normalizedToYear(point.x);
+                timeStr = Math.round(year).toString();
+            } else {
+                // For other slides, use logarithmic time format
+                const timeYears = this.metalogUtils.normalizedToTime(point.x);
+                timeStr = this.metalogUtils.formatTime(timeYears);
+            }
+            
             const probStr = (point.y * 100).toFixed(0) + "%";
 
             const row = document.createElement("tr");
@@ -456,9 +540,28 @@ class SurveyLogic {
         titleElement.addEventListener("keydown", keydownHandler);
     }
 
+    // Calculate total steps dynamically
+    get totalSteps() {
+        // Count by trying each step until we hit the final slide
+        let count = 0;
+        while (true) {
+            const item = this.getCurrentItemForStep(count);
+            if (item.type === "final") {
+                return count + 1; // Include the final slide
+            }
+            count++;
+            if (count > 20) break; // Safety limit
+        }
+        return count;
+    }
+
     // Survey navigation
     getCurrentItem() {
-        switch (this.currentStep) {
+        return this.getCurrentItemForStep(this.currentStep);
+    }
+
+    getCurrentItemForStep(step) {
+        switch (step) {
             case 0:
                 return { type: "intro", item: SURVEY_CONFIG.introCard };
             case 1:
@@ -475,10 +578,15 @@ class SurveyLogic {
                 };
             case 4:
                 return {
+                    type: "doomAssessment",
+                    item: SURVEY_CONFIG.doomAssessmentCard,
+                };
+            case 5:
+                return {
                     type: "review",
                     item: { title: "Review Your Distribution" },
                 };
-            case 5:
+            case 6:
             default:
                 return { type: "final", item: { title: "Survey Complete" } };
         }
@@ -568,6 +676,9 @@ class SurveyLogic {
                 this.createMetalogTestCard(currentItem.item, container);
                 break;
             case "aiTimelines":
+                this.createMetalogTestCard(currentItem.item, container);
+                break;
+            case "doomAssessment":
                 this.createMetalogTestCard(currentItem.item, container);
                 break;
             case "review":
@@ -709,6 +820,11 @@ class SurveyLogic {
             relevantTableIds = Object.keys(this.tableStates).filter(id => 
                 id === "metalog-test" || id.startsWith("table-")
             );
+        } else if (currentItem.type === "doomAssessment") {
+            // Only count doom assessment tables
+            relevantTableIds = Object.keys(this.tableStates).filter(id => 
+                id.includes("assessment") || id.startsWith("table-")
+            );
         } else {
             // Default behavior for other slides
             relevantTableIds = Object.keys(this.tableStates);
@@ -806,6 +922,11 @@ class SurveyLogic {
             relevantTableIds = Object.keys(this.tableStates).filter(id => 
                 id === "metalog-test" || id.startsWith("table-")
             );
+        } else if (currentItem.type === "doomAssessment") {
+            // Only show doom assessment tables
+            relevantTableIds = Object.keys(this.tableStates).filter(id => 
+                id.includes("assessment") || id.startsWith("table-")
+            );
         } else {
             // Default: show all tables
             relevantTableIds = Object.keys(this.tableStates);
@@ -873,6 +994,9 @@ class SurveyLogic {
         } else if (currentItem.type === "aiTimelines") {
             // Only render the timeline tables
             tablesToRender = Object.keys(this.tableStates).filter(id => id.includes('timeline'));
+        } else if (currentItem.type === "doomAssessment") {
+            // Only render the doom assessment tables
+            tablesToRender = Object.keys(this.tableStates).filter(id => id.includes('assessment'));
         } else {
             // Default: render all tables (for review or other contexts)
             tablesToRender = Object.keys(this.tableStates);
