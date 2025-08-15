@@ -33,6 +33,7 @@ class InitTests {
         this.testParsingEdgeCases();
         this.testRoundTripConversions();
         this.testFormatting();
+        this.testTimelineYearInput();
         
         this.logResults();
     }
@@ -56,21 +57,24 @@ class InitTests {
         try {
             const convUtils = new ConversionUtils();
             
-            // Basic parsing
-            this.test('parseTimeInput - 1 year', convUtils.parseTimeInput('1 year') === 1);
-            this.test('parseTimeInput - 10 years', convUtils.parseTimeInput('10 years') === 10);
-            this.test('parseTimeInput - 1 day', Math.abs(convUtils.parseTimeInput('1 day') - 1/365.25) < 0.001);
-            this.test('parseTimeInput - 6 months', Math.abs(convUtils.parseTimeInput('6 months') - 0.5) < 0.001);
-            this.test('parseTimeInput - 1 century', convUtils.parseTimeInput('1 century') === 100);
+            // Duration parsing (renamed function)
+            this.test('parseDuration - 1 year', convUtils.parseDuration('1 year') === 1);
+            this.test('parseDuration - 10 years', convUtils.parseDuration('10 years') === 10);
+            this.test('parseDuration - 1 day', Math.abs(convUtils.parseDuration('1 day') - 1/365.25) < 0.001);
+            this.test('parseDuration - 6 months', Math.abs(convUtils.parseDuration('6 months') - 0.5) < 0.001);
+            this.test('parseDuration - 1 century', convUtils.parseDuration('1 century') === 100);
+            
+            // Legacy function still works
+            this.test('parseTimeInput - legacy compatibility', convUtils.parseTimeInput('5 years') === 5);
             
             // Probability parsing
             this.test('parseProbabilityInput - 50%', convUtils.parseProbabilityInput('50%') === 0.5);
             this.test('parseProbabilityInput - 0.25', convUtils.parseProbabilityInput('0.25') === 0.25);
             this.test('parseProbabilityInput - 100%', convUtils.parseProbabilityInput('100%') === 1);
             
-            // Invalid inputs
-            this.test('parseTimeInput - invalid', convUtils.parseTimeInput('invalid') === null);
-            this.test('parseTimeInput - negative', convUtils.parseTimeInput('-5 years') === null);
+            // Invalid inputs for duration parsing
+            this.test('parseDuration - invalid', convUtils.parseDuration('invalid') === null);
+            this.test('parseDuration - negative', convUtils.parseDuration('-5 years') === null);
             this.test('parseProbabilityInput - invalid', convUtils.parseProbabilityInput('invalid') === null);
             
         } catch (e) {
@@ -86,12 +90,16 @@ class InitTests {
         try {
             const metalogUtils = new MetalogUtils();
             
-            // Inheritance check
-            this.test('MetalogUtils inherits parseTimeInput', typeof metalogUtils.parseTimeInput === 'function');
+            // Inheritance check - both new and legacy functions
+            this.test('MetalogUtils inherits parseDuration', typeof metalogUtils.parseDuration === 'function');
+            this.test('MetalogUtils inherits parseAbsoluteYear', typeof metalogUtils.parseAbsoluteYear === 'function');
+            this.test('MetalogUtils inherits parseTimeInput (legacy)', typeof metalogUtils.parseTimeInput === 'function');
             this.test('MetalogUtils inherits formatTime', typeof metalogUtils.formatTime === 'function');
             
             // Inherited functionality
-            this.test('Inherited parseTimeInput works', metalogUtils.parseTimeInput('5 years') === 5);
+            this.test('Inherited parseDuration works', metalogUtils.parseDuration('5 years') === 5);
+            this.test('Inherited parseAbsoluteYear works', metalogUtils.parseAbsoluteYear('2030') === 2030);
+            this.test('Inherited parseTimeInput (legacy) works', metalogUtils.parseTimeInput('3 years') === 3);
             
             // Metalog-specific functionality
             this.test('timeToNormalized exists', typeof metalogUtils.timeToNormalized === 'function');
@@ -110,18 +118,22 @@ class InitTests {
         try {
             const convUtils = new ConversionUtils();
             
-            // Plural/singular variations
-            this.test('1 day vs days', convUtils.parseTimeInput('1 day') === convUtils.parseTimeInput('1 days'));
-            this.test('1 month vs months', convUtils.parseTimeInput('1 month') === convUtils.parseTimeInput('1 months'));
-            this.test('1 year vs years', convUtils.parseTimeInput('1 year') === convUtils.parseTimeInput('1 years'));
+            // Duration parsing edge cases
+            this.test('1 day vs days', convUtils.parseDuration('1 day') === convUtils.parseDuration('1 days'));
+            this.test('1 month vs months', convUtils.parseDuration('1 month') === convUtils.parseDuration('1 months'));
+            this.test('1 year vs years', convUtils.parseDuration('1 year') === convUtils.parseDuration('1 years'));
             
-            // Different formats
-            this.test('Whitespace handling', convUtils.parseTimeInput('  10 years  ') === 10);
-            this.test('Case insensitive', convUtils.parseTimeInput('10 YEARS') === 10);
-            this.test('Mixed case', convUtils.parseTimeInput('10 Years') === 10);
+            // Different formats for durations
+            this.test('Whitespace handling', convUtils.parseDuration('  10 years  ') === 10);
+            this.test('Case insensitive', convUtils.parseDuration('10 YEARS') === 10);
+            this.test('Mixed case', convUtils.parseDuration('10 Years') === 10);
             
             // Number without unit (defaults to years)
-            this.test('Number only defaults to years', convUtils.parseTimeInput('5') === 5);
+            this.test('Number only defaults to years', convUtils.parseDuration('5') === 5);
+            
+            // Absolute year parsing edge cases
+            this.test('Absolute year with whitespace', convUtils.parseAbsoluteYear('  2030  ') === 2030);
+            this.test('Fractional year parsing', convUtils.parseAbsoluteYear('2029.8') === 2029.8);
             
             // Percentage formats
             this.test('Percentage with spaces', convUtils.parseProbabilityInput(' 75% ') === 0.75);
@@ -179,6 +191,66 @@ class InitTests {
             
         } catch (e) {
             this.test('Formatting tests', false, e.message);
+        }
+        
+        console.groupEnd();
+    }
+
+    testTimelineYearInput() {
+        console.group('🧪 Testing Timeline Year Input');
+        
+        try {
+            // Use ConversionUtils which is available from conversion-utilities.js
+            const conversionUtils = new ConversionUtils();
+            
+            // Test absolute year parsing (new function)
+            this.test('Parse "2030" as absolute year', 
+                conversionUtils.parseAbsoluteYear("2030") === 2030);
+            
+            this.test('Parse "2045" as absolute year', 
+                conversionUtils.parseAbsoluteYear("2045") === 2045);
+            
+            // Test half-years - the key question!
+            this.test('Parse "2027.5" as half year', 
+                conversionUtils.parseAbsoluteYear("2027.5") === 2027.5);
+            
+            this.test('Parse "2033.5" as half year', 
+                conversionUtils.parseAbsoluteYear("2033.5") === 2033.5);
+            
+            // Test quarter years
+            this.test('Parse "2026.25" as quarter year', 
+                conversionUtils.parseAbsoluteYear("2026.25") === 2026.25);
+            
+            this.test('Parse "2028.75" as quarter year', 
+                conversionUtils.parseAbsoluteYear("2028.75") === 2028.75);
+            
+            // Test duration parsing (renamed function) 
+            this.test('Parse "5 years" as duration', 
+                conversionUtils.parseDuration("5 years") === 5);
+            
+            this.test('Parse "2 years" as duration', 
+                conversionUtils.parseDuration("2 years") === 2);
+            
+            // Test backward compatibility (legacy function)
+            this.test('Legacy parseTimeInput still works for durations', 
+                conversionUtils.parseTimeInput("3 years") === 3);
+            
+            // Test invalid inputs for absolute years
+            this.test('Parse invalid year returns null', 
+                conversionUtils.parseAbsoluteYear("not-a-year") === null);
+            
+            this.test('Parse empty string returns null', 
+                conversionUtils.parseAbsoluteYear("") === null);
+            
+            this.test('Parse out-of-range year returns null', 
+                conversionUtils.parseAbsoluteYear("1990") === null);
+            
+            // Test that absolute year parser rejects duration strings
+            this.test('parseAbsoluteYear rejects "5 years"', 
+                conversionUtils.parseAbsoluteYear("5 years") === null);
+            
+        } catch (e) {
+            this.test('Timeline year input parsing', false, e.message);
         }
         
         console.groupEnd();

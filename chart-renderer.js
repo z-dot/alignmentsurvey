@@ -194,7 +194,7 @@ class ChartRenderer {
 
     // === CURVE DRAWING ===
 
-    drawMetalogCurve(data, name, index) {
+    drawMetalogCurve(data, name, index, tableContext = null) {
         const line = d3.line()
             .x((d) => this.xScale(d.x))
             .y((d) => this.yScaleApproaches(this.transformY(d.y)))
@@ -207,11 +207,11 @@ class ChartRenderer {
             .attr("clip-path", "url(#chart-area)")
             .style("stroke", this.getColor(index));
 
-        this.addCurveInteractions(curve, name, { dataPoints: data });
+        this.addCurveInteractions(curve, name, { dataPoints: data }, tableContext);
         this.addCurveLabel(name, index, data);
     }
 
-    drawPiecewiseLinearCurve(linearData, name, index) {
+    drawInterpolationCurve(linearData, name, index, tableContext = null) {
         const line = d3.line()
             .x((d) => this.xScale(d.x))
             .y((d) => this.yScaleApproaches(this.transformY(d.y)))
@@ -228,6 +228,7 @@ class ChartRenderer {
             curve,
             name + " (smooth interpolation fallback)",
             { dataPoints: linearData },
+            tableContext
         );
         this.addCurveLabel(name, index, linearData);
     }
@@ -312,11 +313,11 @@ class ChartRenderer {
 
     // === INTERACTIONS ===
 
-    addCurveInteractions(curve, name, metalog) {
+    addCurveInteractions(curve, name, metalog, tableContext = null) {
         curve.on("mouseover", (event) => this.showTooltip(event, name))
             .on(
                 "mousemove",
-                (event) => this.showCoordinateTooltip(event, metalog),
+                (event) => this.showCoordinateTooltip(event, metalog, tableContext),
             )
             .on("mouseout", () => this.hideTooltip());
     }
@@ -347,12 +348,15 @@ class ChartRenderer {
         document.getElementById("tooltip").style.display = "none";
     }
 
-    showCoordinateTooltip(event, metalog) {
+    showCoordinateTooltip(event, metalog, tableContext = null) {
         const [mouseX, mouseY] = d3.pointer(event);
 
         const normalizedTime = this.xScale.invert(mouseX);
         const transformedProb = this.yScaleApproaches.invert(mouseY);
-        const probability = this.inverseTransformY(transformedProb);
+        let probability = this.inverseTransformY(transformedProb);
+        
+        // If this is a survival table and we're showing transformed data,
+        // the probability is already correct for display (no need to re-transform)
         
         let timeStr;
         if (this.shouldUseLinearYearAxis()) {
@@ -360,19 +364,26 @@ class ChartRenderer {
             const currentYear = 2025;
             const maxYear = 2065;
             const year = currentYear + normalizedTime * (maxYear - currentYear);
-            timeStr = Math.round(year).toString();
+            // Round to quarter-year increments (0.25 precision)
+            const quarterRounded = Math.round(year * 4) / 4;
+            timeStr = quarterRounded % 1 === 0 ? quarterRounded.toString() : quarterRounded.toString();
         } else {
             // Log time mode: use existing conversion
             const timeInYears = this.metalogUtils.normalizedToTime(normalizedTime);
             timeStr = this.metalogUtils.formatTime(timeInYears);
         }
 
+        // Enhanced tooltip with table name
+        const tableName = tableContext?.tableName || "Chart";
+        const probabilityLabel = tableContext?.isSurvival ? 
+            (tableContext.tableId?.includes('doom') ? 'P(doom)' : 'P(misalignment)') : 
+            'Probability';
+
         const tooltip = document.getElementById("tooltip");
         tooltip.innerHTML = `
-            <strong>Coordinates:</strong><br/>
-            Time: ${timeStr}<br/>
-            Probability: ${(probability * 100).toFixed(1)}%<br/>
-            <em>Hover curve for exact values</em>
+            <div style="font-weight: bold; margin-bottom: 4px;">${tableName}</div>
+            <div>Time: <strong>${timeStr}</strong></div>
+            <div>${probabilityLabel}: <strong>${(probability * 100).toFixed(1)}%</strong></div>
         `;
         tooltip.style.left = (event.pageX + 10) + "px";
         tooltip.style.top = (event.pageY - 10) + "px";
@@ -404,8 +415,8 @@ class ChartRenderer {
                             "Table-based Approach",
                             0,
                         );
-                    } else if (this.surveyLogic.tableBasedData.type === "linear_interpolation" && this.surveyLogic.tableBasedData.interpolatedData) {
-                        this.drawPiecewiseLinearCurve(
+                    } else if (this.surveyLogic.tableBasedData.type === "interpolation" && this.surveyLogic.tableBasedData.interpolatedData) {
+                        this.drawInterpolationCurve(
                             this.surveyLogic.tableBasedData.interpolatedData,
                             "Table-based Approach", 
                             0,
@@ -614,58 +625,51 @@ class ChartRenderer {
 
     addCurveLabel(text, index, data = null) {
         const color = this.getColor(index);
-        const fontSize = 12; // Base font size
-        const fontSizeEm = fontSize / 16; // Convert to em for calculations
+        const fontSize = 12;
         
         let x, y;
         
         if (data && data.length > 0) {
-            // Position label to the right of the chart area (beyond x=1)
+            // Position label at the curve endpoint
             const lastPoint = data[data.length - 1];
-            const rightEdgeX = this.xScale(1); // Right edge of chart (x=1)
+            const rightEdgeX = this.xScale(1); // Right edge of chart area
             const baseY = this.yScaleApproaches(this.transformY(lastPoint.y));
             
-            console.log(`📍 Label "${text}": lastPoint=`, lastPoint, `rightEdgeX=${rightEdgeX}, baseY=${baseY}`);
-            
-            // Dynamic spacing based on font size
-            const horizontalPadding = fontSize * 1.5; // Increase padding to push labels further right
-            const estimatedCharWidth = fontSize * 0.6;
-            const labelWidth = text.length * estimatedCharWidth;
-            
-            // Position label to the right of the chart with proper spacing
+            // Position label to the right of chart with consistent spacing
+            const horizontalPadding = fontSize * 1.2;
             x = rightEdgeX + horizontalPadding;
             y = baseY;
             
-            console.log(`📍 Initial position for "${text}": x=${x}, y=${y}`);
-            
-            // Simple collision avoidance - stack labels vertically if they would overlap horizontally
+            // Smart vertical collision avoidance
             const existingLabels = this.svg.selectAll("text:not(.axis text)");
-            const verticalSpacing = fontSize * 2; // Increased spacing
-            let yOffset = 0;
+            const minVerticalSpacing = fontSize * 1.6;
             
+            // Collect existing label positions and sort by Y
+            const labelPositions = [];
             existingLabels.each(function() {
-                const existingLabel = d3.select(this);
-                const existingY = parseFloat(existingLabel.attr("y"));
-                const existingX = parseFloat(existingLabel.attr("x"));
-                
-                // Check if this label would overlap with existing label
-                if (Math.abs(existingX - x) < labelWidth && Math.abs(existingY - (y + yOffset)) < verticalSpacing) {
-                    yOffset += verticalSpacing; // Stack below
-                }
+                const existingY = parseFloat(d3.select(this).attr("y"));
+                if (!isNaN(existingY)) labelPositions.push(existingY);
             });
+            labelPositions.sort((a, b) => a - b);
             
-            y = y + yOffset;
-            console.log(`📍 Final position for "${text}": x=${x}, y=${y} (yOffset=${yOffset})`);
-            
-            // Ensure doesn't go off bottom of chart
-            if (y > this.height - fontSize) {
-                y = this.height - fontSize;
+            // Find the best Y position that doesn't collide
+            let bestY = y;
+            for (const existingY of labelPositions) {
+                if (Math.abs(bestY - existingY) < minVerticalSpacing) {
+                    // Too close, push down
+                    bestY = existingY + minVerticalSpacing;
+                }
             }
+            
+            // Ensure label stays within chart bounds
+            const maxY = this.height - fontSize;
+            y = Math.min(bestY, maxY);
+            
         } else {
-            // Fallback to stacked positioning if no data provided
-            const verticalSpacing = fontSize * 1.5;
-            x = this.width - (fontSize * 10); // ~10em from right edge
-            y = (fontSize * 2) + (index * verticalSpacing); // Start at 2em from top
+            // Clean fallback positioning
+            const verticalSpacing = fontSize * 1.8;
+            x = this.width - (fontSize * 8);
+            y = fontSize * 2 + (index * verticalSpacing);
         }
 
         this.svg.append("text")

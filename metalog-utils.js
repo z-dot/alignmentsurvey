@@ -9,8 +9,8 @@ class MetalogUtils extends ConversionUtils {
         this.metalogBasisCache = new Map();
     }
 
-    // MetalogUtils now inherits timeToNormalized, normalizedToTime, parseTimeInput, 
-    // parseProbabilityInput, and formatTime from ConversionUtils
+    // MetalogUtils now inherits timeToNormalized, normalizedToTime, parseDuration, parseAbsoluteYear,
+    // parseTimeInput (legacy), parseProbabilityInput, and formatTime from ConversionUtils
 
     // Data validation
     validateMetalogData(data) {

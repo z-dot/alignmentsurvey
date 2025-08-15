@@ -70,6 +70,7 @@ const SURVEY_CONFIG = {
             {
                 id: "sc-timeline",
                 title: "Superhuman Coder (SC)",
+                titleEditable: false,
                 defaultData: [
                     { time: "2028", probability: "10%" },
                     { time: "2035", probability: "30%" },
@@ -80,6 +81,7 @@ const SURVEY_CONFIG = {
             {
                 id: "sar-timeline", 
                 title: "Superhuman AI Researcher (SAR)",
+                titleEditable: false,
                 defaultData: [
                     { time: "2030", probability: "10%" },
                     { time: "2040", probability: "30%" },
@@ -90,6 +92,7 @@ const SURVEY_CONFIG = {
             {
                 id: "siar-timeline",
                 title: "Superintelligent AI Researcher (SIAR)", 
+                titleEditable: false,
                 defaultData: [
                     { time: "2035", probability: "10%" },
                     { time: "2045", probability: "30%" },
@@ -100,6 +103,7 @@ const SURVEY_CONFIG = {
             {
                 id: "asi-timeline",
                 title: "Artificial Superintelligence (ASI)",
+                titleEditable: false,
                 defaultData: [
                     { time: "2040", probability: "10%" },
                     { time: "2050", probability: "30%" },
@@ -138,6 +142,7 @@ const SURVEY_CONFIG = {
             {
                 id: "doom-assessment",
                 title: "P(doom)",
+                titleEditable: false,
                 probabilityType: "survival",
                 defaultData: [
                     { time: "1 month", probability: "60%" },
@@ -149,6 +154,7 @@ const SURVEY_CONFIG = {
             {
                 id: "misalignment-assessment", 
                 title: "P(misalignment)",
+                titleEditable: false,
                 probabilityType: "survival",
                 defaultData: [
                     { time: "1 month", probability: "80%" },

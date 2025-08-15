@@ -36,9 +36,8 @@ class SurveyLogic {
         if (SURVEY_CONFIG.metalogTestCard?.defaultData) {
             this.tableStates["metalog-test"] = SURVEY_CONFIG.metalogTestCard
                 .defaultData.map((item) => {
-                    const timeYears = this.metalogUtils.parseTimeInput(
-                        item.time,
-                    );
+                    // Metalog test config data contains durations like "1 year", "10 years"
+                    const timeYears = this.metalogUtils.parseDuration(item.time);
                     const probability = this.metalogUtils.parseProbabilityInput(
                         item.probability,
                     );
@@ -63,8 +62,9 @@ class SurveyLogic {
         if (timelineCard && timelineCard.tables) {
             timelineCard.tables.forEach(tableConfig => {
                 const normalizedData = tableConfig.defaultData.map(item => {
-                    const timeYears = this.metalogUtils.parseTimeInput(item.time);
-                    // Use linear year normalization for timeline tables (timeYears is already absolute year)
+                    // Timeline config data contains absolute years like "2025", "2030"
+                    const timeYears = this.metalogUtils.parseAbsoluteYear(item.time);
+                    // Use linear year normalization for timeline tables
                     const normalizedX = this.yearToNormalized(timeYears);
                     
                     return {
@@ -84,7 +84,8 @@ class SurveyLogic {
         if (doomCard && doomCard.tables) {
             doomCard.tables.forEach(tableConfig => {
                 const normalizedData = tableConfig.defaultData.map(item => {
-                    const timeYears = this.metalogUtils.parseTimeInput(item.time);
+                    // Doom config data contains durations like "1 month", "2 years"
+                    const timeYears = this.metalogUtils.parseDuration(item.time);
                     // Use logarithmic time normalization for doom assessment (like metalog test)
                     const normalizedX = this.metalogUtils.timeToNormalized(timeYears);
                     
@@ -108,13 +109,18 @@ class SurveyLogic {
 
     // Check if a table uses survival function (decreasing) semantics
     isSurvivalTable(tableId) {
-        // Check if this table is defined in any config with probabilityType: "survival"
+        const config = this.getTableConfig(tableId);
+        return config?.probabilityType === "survival";
+    }
+
+    // Get table configuration from all available configs
+    getTableConfig(tableId) {
         const allConfigs = [
+            ...(SURVEY_CONFIG.aiTimelinesCard?.tables || []),
             ...(SURVEY_CONFIG.doomAssessmentCard?.tables || [])
         ];
         
-        const config = allConfigs.find(table => table.id === tableId);
-        return config?.probabilityType === "survival";
+        return allConfigs.find(table => table.id === tableId);
     }
 
     // Linear year conversion functions for timeline tables
@@ -167,10 +173,22 @@ class SurveyLogic {
     // PURE UTILITY FUNCTIONS (following invariants.md specification)
     // =============================================================================
 
-    // Parse date string to years, return null if invalid
+    // Context-aware date/time parsing
     parseDate(dateStr) {
-        const result = this.metalogUtils.parseTimeInput(dateStr?.toString().trim());
-        console.log(`🔍 parseDate("${dateStr}") → ${result} years`);
+        const cleanStr = dateStr?.toString().trim();
+        const currentItem = this.getCurrentItem();
+        
+        let result;
+        if (currentItem?.type === "aiTimelines") {
+            // Timeline slides: parse absolute years like "2025", "2027.5"
+            result = this.metalogUtils.parseAbsoluteYear(cleanStr);
+            console.log(`🔍 parseDate("${cleanStr}") → ${result} absolute year [timeline mode]`);
+        } else {
+            // Other slides: parse durations like "2 years", "6 months"
+            result = this.metalogUtils.parseDuration(cleanStr);
+            console.log(`🔍 parseDate("${cleanStr}") → ${result} duration years [duration mode]`);
+        }
+        
         return result;
     }
 
@@ -211,9 +229,10 @@ class SurveyLogic {
                 const currentItem = this.getCurrentItem();
                 
                 if (currentItem?.type === "aiTimelines") {
-                    // For timeline slides, show as absolute year
+                    // For timeline slides, show as absolute year with quarter-year precision
                     const year = this.normalizedToYear(point.x);
-                    cell.textContent = Math.round(year).toString();
+                    const quarterRounded = Math.round(year * 4) / 4;
+                    cell.textContent = quarterRounded.toString();
                 } else {
                     // For other slides, use logarithmic time format
                     const timeYears = this.metalogUtils.normalizedToTime(point.x);
@@ -463,9 +482,10 @@ class SurveyLogic {
             let timeStr;
             
             if (currentItem?.type === "aiTimelines") {
-                // For timeline slides, show as absolute year
+                // For timeline slides, show as absolute year with quarter-year precision
                 const year = this.normalizedToYear(point.x);
-                timeStr = Math.round(year).toString();
+                const quarterRounded = Math.round(year * 4) / 4;
+                timeStr = quarterRounded.toString();
             } else {
                 // For other slides, use logarithmic time format
                 const timeYears = this.metalogUtils.normalizedToTime(point.x);
@@ -799,12 +819,15 @@ class SurveyLogic {
 
     createSingleTable(tableId, tableName = "", canDelete = true) {
         const displayName = tableName || `Table ${tableId.split('-').pop()}`;
+        const config = this.getTableConfig(tableId);
+        const titleEditable = config?.titleEditable !== false; // Default to true if not specified
+        
         return `
             <div class="metalog-table-container" data-table-container="${tableId}" style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px; background-color: #fafafa;">
                 <div class="table-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer;" onclick="surveyLogic.toggleTableCollapse('${tableId}')">
                     <div style="display: flex; align-items: center;">
                         <span class="collapse-indicator" id="collapse-${tableId}" style="margin-right: 8px; font-weight: bold; color: #666;">▼</span>
-                        <h4 contenteditable="true" class="table-title" data-table-id="${tableId}" id="title-${tableId}" style="margin: 0;" onclick="event.stopPropagation()">${displayName}</h4>
+                        <h4 ${titleEditable ? 'contenteditable="true"' : ''} class="table-title ${titleEditable ? '' : 'locked-title'}" data-table-id="${tableId}" id="title-${tableId}" style="margin: 0; ${titleEditable ? 'cursor: text;' : 'cursor: default; color: #444;'}" onclick="event.stopPropagation()">${displayName}</h4>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         ${canDelete ? `<button class="remove-btn" onclick="event.stopPropagation(); surveyLogic.removeTable('${tableId}')" style="font-size: 16px; background: none; border: none; color: #f44336; cursor: pointer; padding: 4px;">×</button>` : ''}
@@ -1083,7 +1106,11 @@ class SurveyLogic {
                     plotData = plotData.map(point => ({ x: point.x, y: 1 - point.y }));
                 }
                 
-                this.visualizer.drawMetalogCurve(plotData, tableName, index);
+                this.visualizer.drawMetalogCurve(plotData, tableName, index, { 
+                    tableId, 
+                    tableName,
+                    isSurvival: this.isSurvivalTable(tableId) 
+                });
                 this.updateTableStatus(tableId, `Metalog fit (k=${distribution.metalog.numTerms})`, false);
             } else if (distribution.type === 'interpolation') {
                 console.log(`⚠️ ${tableName} - Using interpolation`);
@@ -1094,8 +1121,12 @@ class SurveyLogic {
                     interpolationData = interpolationData.map(point => ({ x: point.x, y: 1 - point.y }));
                 }
                 
-                this.visualizer.drawPiecewiseLinearCurve(interpolationData, tableName, index);
-                this.updateTableStatus(tableId, "Linear interpolation", false);
+                this.visualizer.drawInterpolationCurve(interpolationData, tableName, index, { 
+                    tableId, 
+                    tableName,
+                    isSurvival: this.isSurvivalTable(tableId) 
+                });
+                this.updateTableStatus(tableId, "Interpolation", false);
             }
 
         } catch (error) {
@@ -1154,24 +1185,24 @@ class SurveyLogic {
                 );
             } else {
                 console.log(
-                    "✅ Using piecewise linear fallback for table data",
+                    "✅ Using interpolation fallback for table data",
                 );
                 const linearData = this.metalogUtils.createPiecewiseLinearData(
                     data,
                 );
-                console.log("📊 Linear interpolation dataPoints for plotting:", linearData);
-                this.visualizer.drawPiecewiseLinearCurve(
+                console.log("📊 Interpolation dataPoints for plotting:", linearData);
+                this.visualizer.drawInterpolationCurve(
                     linearData,
                     "Table-based Approach",
                     0,
                 );
                 this.tableBasedData = {
-                    type: "linear_interpolation",
+                    type: "interpolation",
                     originalData: data,
                     interpolatedData: linearData,
                 };
                 this.updateTableStatus(
-                    `Linear interpolation with ${data.length} points`,
+                    `Interpolation with ${data.length} points`,
                 );
             }
             this.hideMetalogError();

@@ -30,8 +30,9 @@ class ConversionUtils {
     // INPUT PARSING FUNCTIONS
     // =============================================================================
 
-    parseTimeInput(timeStr) {
-        const cleaned = timeStr.toLowerCase().trim();
+    // Duration parsing - for relative time periods like "2 years", "6 months"
+    parseDuration(durationStr) {
+        const cleaned = durationStr.toLowerCase().trim();
         const number = parseFloat(cleaned);
         
         if (isNaN(number) || number <= 0) return null;
@@ -46,6 +47,34 @@ class ConversionUtils {
         
         // Default to years if no unit specified
         return number;
+    }
+
+    // Backward compatibility alias - will be removed once all references are updated
+    parseTimeInput(timeStr) {
+        return this.parseDuration(timeStr);
+    }
+
+    // Absolute year parsing - for timeline slides like "2025", "2027.5"
+    parseAbsoluteYear(yearStr) {
+        const cleaned = yearStr.trim();
+        const number = parseFloat(cleaned);
+        
+        if (isNaN(number)) return null;
+        
+        // For timeline context, we expect years in range 2025-2065
+        // Allow fractional years like 2027.5
+        if (number >= 2025 && number <= 2065) {
+            return number;
+        }
+        
+        // If it looks like a duration (has text), fall back to duration parsing
+        if (cleaned.toLowerCase().includes('year') || 
+            cleaned.toLowerCase().includes('month') || 
+            cleaned.toLowerCase().includes('day')) {
+            return null; // Should use parseDuration instead
+        }
+        
+        return null; // Invalid year
     }
 
     parseProbabilityInput(probStr) {
