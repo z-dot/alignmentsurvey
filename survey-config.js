@@ -250,4 +250,12 @@ const SURVEY_CONFIG = {
             std: 0.3
         },
     ],
+
+    // Page-table mapping: defines which tables belong to which survey page
+    pageTableMapping: {
+        "metalogTest": ["metalog-test"],
+        "aiTimelines": ["sc-timeline", "sar-timeline", "siar-timeline", "asi-timeline"],
+        "doomAssessment": ["doom-assessment", "misalignment-assessment"],
+        "review": "all" // Special case: show all tables
+    },
 };

@@ -17,6 +17,7 @@ class SurveyLogic {
         // Invariants: unique x-values, sorted by x, monotonic in y (CDF property)
         this.tableStates = {};
 
+
         // Initialize default table states
         this.initializeTableStates();
         
@@ -682,25 +683,18 @@ class SurveyLogic {
         // Update button states
         const prevButton = document.getElementById("prevStep");
         const nextButton = document.getElementById("nextStep");
-        const navigationControls = document.querySelector(
-            ".navigation-controls",
-        );
+        const navigationBar = document.querySelector(".navigation-bar");
 
         // Disable/enable buttons
         prevButton.disabled = this.currentStep === 0;
         nextButton.disabled = this.currentStep === this.totalSteps - 1;
 
-        // Hide navigation controls entirely on final slide
+        // Hide navigation bar entirely on final slide
         if (this.currentStep === this.totalSteps - 1) {
-            navigationControls.style.display = "none";
+            navigationBar.style.display = "none";
         } else {
-            navigationControls.style.display = "block";
+            navigationBar.style.display = "flex";
         }
-
-        // Always show the current item container (no more separate survey-complete div)
-        document.getElementById("current-item-container").style.display =
-            "block";
-        document.getElementById("survey-complete").style.display = "none";
 
         // Update next button tooltip
         this.updateNextButtonTooltip();
@@ -716,38 +710,201 @@ class SurveyLogic {
     }
 
     showCurrentStep() {
-        const container = document.getElementById("current-item-container");
+        const cardsContainer = document.getElementById("cards-container");
         const currentItem = this.getCurrentItem();
 
+        // Clear previous cards
+        cardsContainer.innerHTML = '';
+
+        // Create cards based on current step
         switch (currentItem.type) {
             case "intro":
-                this.createInfoCard(currentItem.item, container);
+                this.createInfoCards(currentItem.item, cardsContainer);
                 break;
             case "example":
-                this.createExampleCard(currentItem.item, container);
+                this.createExampleCards(currentItem.item, cardsContainer);
                 break;
             case "metalogTest":
-                this.createMetalogTestCard(currentItem.item, container);
+                this.createTableCards(currentItem.item, cardsContainer);
                 break;
             case "aiTimelines":
-                this.createMetalogTestCard(currentItem.item, container);
+                this.createTimelineCards(currentItem.item, cardsContainer);
                 break;
             case "doomAssessment":
-                this.createMetalogTestCard(currentItem.item, container);
+                this.createDoomAssessmentCards(currentItem.item, cardsContainer);
                 break;
             case "review":
-                this.createReviewUI(currentItem.item, container);
+                this.createReviewCards(currentItem.item, cardsContainer);
                 break;
             case "final":
-                this.createFinalUI(currentItem.item, container);
-                break;
+                // Show survey complete view
+                cardsContainer.style.display = "none";
+                document.getElementById("survey-complete").style.display = "block";
+                return;
         }
 
+        // Ensure cards container is visible
+        cardsContainer.style.display = "flex";
+        document.getElementById("survey-complete").style.display = "none";
+
         this.updateProgressDisplay();
-        this.visualizer.updateVisualization();
+        this.updateVisualization();
     }
 
-    // UI Creation Methods
+    // ===== CARD-BASED UI CREATION METHODS =====
+    
+    createInfoCards(item, cardsContainer) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <h4>${item.title}</h4>
+            <div>${item.content}</div>
+        `;
+        cardsContainer.appendChild(card);
+    }
+    
+    createExampleCards(item, cardsContainer) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <h4>${item.title}</h4>
+            <div>${item.content}</div>
+        `;
+        cardsContainer.appendChild(card);
+    }
+    
+    createTableCards(item, cardsContainer) {
+        // Instructions card
+        const instructionCard = document.createElement('div');
+        instructionCard.className = 'card';
+        instructionCard.innerHTML = `
+            <h4>${item.title}</h4>
+            <div>${item.content || 'Enter time/probability pairs in the table below.'}</div>
+        `;
+        cardsContainer.appendChild(instructionCard);
+        
+        // Table card
+        const tableCard = document.createElement('div');
+        tableCard.className = 'card';
+        tableCard.innerHTML = `
+            <h4>Metalog Test Data</h4>
+            <div id="metalog-table-container"></div>
+        `;
+        cardsContainer.appendChild(tableCard);
+        
+        // Create the table structure and render data
+        this.createTableStructure("metalog-test", tableCard.querySelector('#metalog-table-container'));
+    }
+    
+    createTimelineCards(item, cardsContainer) {
+        // Instructions card
+        const instructionCard = document.createElement('div');
+        instructionCard.className = 'card';
+        instructionCard.innerHTML = `
+            <h4>${item.title}</h4>
+            <div>${item.content}</div>
+        `;
+        cardsContainer.appendChild(instructionCard);
+        
+        // Create a card for each timeline table
+        if (item.tables) {
+            item.tables.forEach(tableConfig => {
+                const tableCard = document.createElement('div');
+                tableCard.className = 'card';
+                tableCard.innerHTML = `
+                    <h4>${tableConfig.title}</h4>
+                    <div id="table-${tableConfig.id}-container"></div>
+                `;
+                cardsContainer.appendChild(tableCard);
+                
+                this.createTableStructure(tableConfig.id, tableCard.querySelector(`#table-${tableConfig.id}-container`));
+            });
+        }
+        
+        // Comment card if enabled
+        if (item.commentBox?.enabled) {
+            this.createCommentCard(item.commentBox, cardsContainer);
+        }
+    }
+    
+    createDoomAssessmentCards(item, cardsContainer) {
+        // Instructions card
+        const instructionCard = document.createElement('div');
+        instructionCard.className = 'card';
+        instructionCard.innerHTML = `
+            <h4>${item.title}</h4>
+            <div>${item.content}</div>
+        `;
+        cardsContainer.appendChild(instructionCard);
+        
+        // Create a card for each doom table
+        if (item.tables) {
+            item.tables.forEach(tableConfig => {
+                const tableCard = document.createElement('div');
+                tableCard.className = 'card';
+                tableCard.innerHTML = `
+                    <h4>${tableConfig.title}</h4>
+                    <div id="table-${tableConfig.id}-container"></div>
+                `;
+                cardsContainer.appendChild(tableCard);
+                
+                this.createTableStructure(tableConfig.id, tableCard.querySelector(`#table-${tableConfig.id}-container`));
+            });
+        }
+        
+        // Comment card if enabled
+        if (item.commentBox?.enabled) {
+            this.createCommentCard(item.commentBox, cardsContainer);
+        }
+    }
+    
+    createReviewCards(item, cardsContainer) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <h4>Review Your Responses</h4>
+            <p>All your survey responses are displayed in the chart above.</p>
+        `;
+        cardsContainer.appendChild(card);
+    }
+    
+    createCommentCard(commentConfig, cardsContainer) {
+        const commentCard = document.createElement('div');
+        commentCard.className = 'card';
+        commentCard.innerHTML = `
+            <h4>Comments</h4>
+            <p class="comment-prompt">${commentConfig.prompt}</p>
+            <textarea class="comment-textarea" placeholder="Share your thoughts..." rows="4"></textarea>
+        `;
+        cardsContainer.appendChild(commentCard);
+    }
+    
+    createTableStructure(tableId, container) {
+        // Create the table HTML structure that renderTable expects
+        container.innerHTML = `
+            <div class="metalog-table-container">
+                <table class="metalog-data-table" id="table-${tableId}">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Probability</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-${tableId}">
+                        <!-- Table rows will be dynamically populated -->
+                    </tbody>
+                </table>
+                <button class="button" onclick="surveyLogic.addMetalogRow('${tableId}')">Add Row</button>
+            </div>
+        `;
+        
+        // Now render the actual table data
+        this.renderTable(tableId);
+    }
+
+    // ===== LEGACY UI CREATION METHODS (for reference) =====
+    
     createInfoCard(card, container) {
         container.innerHTML = `
             <div class="info-card">
@@ -1052,26 +1209,30 @@ class SurveyLogic {
     }
 
     updateVisualization() {
+        console.log("🎨 updateVisualization() called");
+        
         // Clear existing curves
         this.visualizer.svg.selectAll(".s-curve").remove();
         this.visualizer.svg.selectAll("text:not(.axis text)").remove();
 
         // Get current slide context to determine which tables to render
         const currentItem = this.getCurrentItem();
+        console.log("📊 Current item:", currentItem.type);
         let tablesToRender = [];
 
-        if (currentItem.type === "metalogTest") {
-            // Only render the metalog test table
-            tablesToRender = ["metalog-test"];
-        } else if (currentItem.type === "aiTimelines") {
-            // Only render the timeline tables
-            tablesToRender = Object.keys(this.tableStates).filter(id => id.includes('timeline'));
-        } else if (currentItem.type === "doomAssessment") {
-            // Only render the doom assessment tables
-            tablesToRender = Object.keys(this.tableStates).filter(id => id.includes('assessment'));
-        } else {
-            // Default: render all tables (for review or other contexts)
+        // Get tables for current page using config-driven mapping
+        const pageType = currentItem.type;
+        const tablesForPage = SURVEY_CONFIG.pageTableMapping[pageType];
+        
+        if (tablesForPage === "all") {
+            // Special case: show all tables (e.g., review page)
             tablesToRender = Object.keys(this.tableStates);
+        } else if (tablesForPage) {
+            // Only render tables that belong to this page AND exist in state
+            tablesToRender = tablesForPage.filter(tableId => this.tableStates[tableId]);
+        } else {
+            // Unknown page type: don't render any tables
+            tablesToRender = [];
         }
 
         console.log(`📊 Rendering tables for ${currentItem.type}:`, tablesToRender);
@@ -1087,9 +1248,9 @@ class SurveyLogic {
     }
 
     renderTableCurve(tableId, data, index) {
-        // Get table display name
-        const titleElement = document.querySelector(`[data-table-id="${tableId}"].table-title`);
-        const tableName = titleElement ? titleElement.textContent.trim() : `Table ${index + 1}`;
+        // Get table display name from config (stored in state)
+        const config = this.getTableConfig(tableId);
+        const tableName = config?.title || `Table ${index + 1}`;
 
         try {
             console.log(`📈 Rendering curve for ${tableName}:`, data);

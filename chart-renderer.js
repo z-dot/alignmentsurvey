@@ -1,10 +1,10 @@
 // Chart Renderer - Focused on D3 visualization and curve drawing
 class ChartRenderer {
     constructor() {
-        // Chart configuration
-        this.margin = { top: 40, right: 150, bottom: 100, left: 60 };
+        // Chart configuration - reasonable size with space for labels
+        this.margin = { top: 40, right: 200, bottom: 80, left: 60 };
         this.width = 1000 - this.margin.left - this.margin.right;
-        this.height = 600 - this.margin.top - this.margin.bottom;
+        this.height = 400 - this.margin.top - this.margin.bottom;
 
         // Initialize utilities
         this.metalogUtils = new MetalogUtils();
@@ -56,9 +56,9 @@ class ChartRenderer {
     }
 
     // Determine if current slide should use linear year axis
-    shouldUseLinearYearAxis() {
-        const currentItem = this.surveyLogic?.getCurrentItem();
-        return currentItem?.type === "aiTimelines";
+    shouldUseLinearYearAxis(currentItem = null) {
+        const item = currentItem || this.surveyLogic?.getCurrentItem();
+        return item?.type === "aiTimelines";
     }
 
     // Linear year conversion functions for timeline slides
@@ -117,8 +117,8 @@ class ChartRenderer {
             .attr("height", this.splitY);
     }
 
-    getTimeTicks() {
-        if (this.shouldUseLinearYearAxis()) {
+    getTimeTicks(currentItem = null) {
+        if (this.shouldUseLinearYearAxis(currentItem)) {
             return this.getLinearYearTicks();
         }
         
@@ -396,11 +396,11 @@ class ChartRenderer {
         // Clear existing curves and labels
         this.svg.selectAll(".s-curve").remove();
         this.svg.selectAll("text:not(.axis text)").remove();
-        
-        // Update axes for context-aware rendering
-        this.updateAxesForCurrentContext();
 
         const currentItem = this.surveyLogic.getCurrentItem();
+        
+        // Update axes for context-aware rendering
+        this.updateAxesForCurrentContext(currentItem);
 
         switch (currentItem.type) {
             case "example":
@@ -433,13 +433,13 @@ class ChartRenderer {
         }
     }
 
-    updateAxesForCurrentContext() {
+    updateAxesForCurrentContext(currentItem = null) {
         // Remove existing x-axis and grid
         this.svg.selectAll(".x-axis").remove();
         this.svg.selectAll(".grid").remove();
         
         // Redraw x-axis with context-appropriate ticks
-        const timeTicks = this.getTimeTicks();
+        const timeTicks = this.getTimeTicks(currentItem);
         const xAxis = d3.axisBottom(this.xScale)
             .tickValues(timeTicks.map((d) => d.position))
             .tickFormat((d, i) => timeTicks[i].label);

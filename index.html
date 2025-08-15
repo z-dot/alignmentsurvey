@@ -29,7 +29,7 @@
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             background-color: #FFFFF8;
             padding: 20px;
@@ -37,41 +37,28 @@
         
         .main-content {
             display: flex;
-            gap: 30px;
-            align-items: flex-start;
+            flex-direction: column;
+            gap: 25px;
         }
         
         .chart-container {
-            flex: 1;
-            min-width: 600px;
+            width: 100%;
             text-align: center;
         }
         
         .controls {
-            flex: 0 0 400px;
-            min-width: 400px;
+            width: 100%;
+            background-color: #fafafa;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+            padding: 20px;
         }
         
-        /* Stack vertically on smaller screens */
+        /* Responsive adjustments */
         @media (max-width: 1200px) {
             .container {
-                max-width: 900px;
-            }
-            
-            .main-content {
-                flex-direction: column;
-                gap: 20px;
-            }
-            
-            .controls {
-                flex: none;
-                min-width: unset;
-                width: 100%;
-            }
-            
-            .chart-container {
-                min-width: unset;
-                width: 100%;
+                max-width: 100%;
+                padding: 15px;
             }
         }
         
@@ -111,11 +98,71 @@
             stroke-width: 1;
         }
         
-        .controls {
-            padding: 20px;
-            background-color: #f9f9f9;
+        .navigation-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            padding: 15px 0;
+            margin-bottom: 20px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .progress-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .progress-section p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #666;
+            white-space: nowrap;
+        }
+        
+        .cards-container {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            padding: 20px 0;
+            scrollbar-width: thin;
+            scrollbar-color: #2A623D #f0f0f0;
+            scroll-behavior: smooth;
+        }
+        
+        .cards-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .cards-container::-webkit-scrollbar-track {
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+        
+        .cards-container::-webkit-scrollbar-thumb {
+            background: #2A623D;
+            border-radius: 4px;
+        }
+        
+        .card {
+            flex: 0 0 auto;
+            min-width: 320px;
+            max-width: 450px;
+            background-color: white;
             border-radius: 8px;
             border: 1px solid #ddd;
+            padding: 20px;
+            scroll-snap-align: start;
+            height: fit-content;
+        }
+        
+        .card h4 {
+            margin: 0 0 15px 0;
+            color: #2A623D;
         }
         
         .control-section {
@@ -272,18 +319,13 @@
             color: #1f4d30;
         }
         
-        .progress-section {
-            margin-bottom: 20px;
-            text-align: center;
-        }
         
         .progress-bar {
-            width: 100%;
-            height: 20px;
-            background-color: #f0f0f0;
-            border-radius: 10px;
+            width: 200px;
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
             overflow: hidden;
-            margin-top: 10px;
         }
         
         .progress-fill {
@@ -301,10 +343,6 @@
             background-color: #f9f9f9;
         }
         
-        .navigation-controls {
-            text-align: center;
-            margin: 20px 0;
-        }
         
         .survey-complete {
             text-align: center;
@@ -491,8 +529,14 @@
             cursor: not-allowed;
         }
 
-        h1 {
-            text-align: center;
+        .header {
+            margin-bottom: 20px;
+        }
+        
+        .header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #2A623D;
         }
 
         .mobile-modal {
@@ -570,7 +614,9 @@
 </head>
 <body>
     <div class="container">
-        <h1>AI Futures alignment difficulty survey</h1>
+        <div class="header">
+            <h2>AI Futures alignment difficulty survey</h2>
+        </div>
         <div class="main-content">
             <div class="chart-container">
                 <div style="text-align: center; margin-bottom: 10px;">
@@ -582,32 +628,36 @@
             </div>
             
             <div class="controls">
-            <div id="progress-indicator" class="progress-section">
-                <p>Step <span id="current-step">1</span> of <span id="total-steps"></span></p>
-                <div class="progress-bar">
-                    <div id="progress-fill" class="progress-fill"></div>
-                </div>
-            </div>
-            
-            <div id="current-item-container" class="current-item">
-                <!-- Current approach or intervention will be displayed here -->
-            </div>
-            
-            <div class="navigation-controls">
-                <button class="button" id="prevStep" disabled>Previous</button>
-                <div class="next-button-container">
-                    <button class="button" id="nextStep">Next</button>
-                    <div class="next-tooltip" id="nextTooltip" style="display: none;">
-                        Move one of the sliders to proceed
+                <!-- Navigation Bar -->
+                <div class="navigation-bar">
+                    <button class="button" id="prevStep" disabled>Previous</button>
+                    
+                    <div class="progress-section">
+                        <p>Step <span id="current-step">1</span> of <span id="total-steps"></span></p>
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="next-button-container">
+                        <button class="button" id="nextStep">Next</button>
+                        <div class="next-tooltip" id="nextTooltip" style="display: none;">
+                            Move one of the sliders to proceed
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <div id="survey-complete" class="survey-complete" style="display: none;">
-                <h3>Survey Complete!</h3>
-                <p>Thank you for completing the AI Alignment Difficulty Survey.</p>
-                <button class="button" id="copyToClipboard">Copy Survey Data</button>
-            </div>
+                
+                <!-- Horizontal Scrolling Cards -->
+                <div class="cards-container" id="cards-container">
+                    <!-- Cards will be dynamically inserted here -->
+                </div>
+                
+                <!-- Survey Complete (hidden by default) -->
+                <div id="survey-complete" class="survey-complete" style="display: none;">
+                    <h3>Survey Complete!</h3>
+                    <p>Thank you for completing the AI Alignment Difficulty Survey.</p>
+                    <button class="button" id="copyToClipboard">Copy Survey Data</button>
+                </div>
             </div>
         </div>
     </div>
