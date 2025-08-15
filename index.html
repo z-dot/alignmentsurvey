@@ -670,7 +670,7 @@
             <h3>Best Viewed on Desktop</h3>
             <p>This survey is optimized for desktop browsers. For the best experience with the interactive visualizations and controls, please use a desktop or laptop computer.</p>
             <p>You can continue on mobile, but some features may be limited.</p>
-            <button class="button" onclick="chartRenderer.dismissMobileModal()">Continue Anyway</button>
+            <button class="button" onclick="surveyCoordinator?.chartRenderer?.dismissMobileModal()">Continue Anyway</button>
         </div>
     </div>
     
@@ -678,16 +678,40 @@
     <script src="https://cdn.jsdelivr.net/npm/mathjs@11.11.0/lib/browser/math.min.js"></script>
     <script src="survey-config.js"></script>
     <script src="conversion-utilities.js"></script>
-    <!-- New modular functional system -->
-    <script type="module" src="metalog-core.js"></script>
-    <script type="module" src="metalog-feasibility.js"></script>
-    <script type="module" src="interpolation.js"></script>
-    <script type="module" src="distribution.js"></script>
-    <script type="module" src="metalog-adapter.js"></script>
-    <!-- Old system (commented out for testing new system) -->
-    <!-- <script src="metalog-utils.js"></script> -->
+    
+    <!-- Distribution system (pure math) -->
+    <script type="module" src="distributions/metalog-core.js"></script>
+    <script type="module" src="distributions/metalog-feasibility.js"></script>
+    <script type="module" src="distributions/interpolation.js"></script>
+    <script type="module" src="distributions/distribution.js"></script>
+    <script type="module" src="distributions/metalog-adapter.js"></script>
+    
+    <!-- New modular architecture -->
+    <script src="core/survey-state.js"></script>
+    <script src="core/table-manager.js"></script>
+    <script src="core/chart-renderer.js"></script>
+    <script src="core/survey-coordinator.js"></script>
+    
+    <!-- Testing and initialization -->
     <script src="init-tests.js"></script>
-    <script src="survey-logic.js"></script>
-    <script defer src="chart-renderer.js"></script>
+    
+    <script>
+        // Global variables for onclick handlers compatibility
+        let surveyCoordinator;
+        
+        window.addEventListener("load", function () {
+            console.log('🚀 Initializing new survey architecture');
+            
+            try {
+                // Initialize the new system
+                surveyCoordinator = new SurveyCoordinator();
+                
+                console.log('✅ New architecture initialized successfully');
+            } catch (error) {
+                console.error('❌ Failed to initialize new architecture:', error);
+                alert('Failed to load survey. Please refresh the page.');
+            }
+        });
+    </script>
 </body>
 </html>
