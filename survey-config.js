@@ -62,6 +62,10 @@ const SURVEY_CONFIG = {
             </div>
         `,
         showMultipleTables: true,
+        commentBox: {
+            enabled: true,
+            prompt: "Please share any assumptions, reasoning, or additional context that influenced your timeline predictions:"
+        },
         tables: [
             {
                 id: "sc-timeline",
@@ -126,25 +130,31 @@ const SURVEY_CONFIG = {
             </div>
         `,
         showMultipleTables: true,
+        commentBox: {
+            enabled: true,
+            prompt: "Please share any assumptions, reasoning, or additional context that influenced your P(doom) and P(misalignment) assessments:"
+        },
         tables: [
             {
                 id: "doom-assessment",
                 title: "P(doom)",
+                probabilityType: "survival",
                 defaultData: [
-                    { time: "1 month", probability: "5%" },
-                    { time: "6 months", probability: "15%" },
-                    { time: "2 years", probability: "35%" },
-                    { time: "10 years", probability: "60%" }
+                    { time: "1 month", probability: "60%" },
+                    { time: "6 months", probability: "35%" },
+                    { time: "2 years", probability: "15%" },
+                    { time: "10 years", probability: "5%" }
                 ]
             },
             {
                 id: "misalignment-assessment", 
                 title: "P(misalignment)",
+                probabilityType: "survival",
                 defaultData: [
-                    { time: "1 month", probability: "15%" },
-                    { time: "6 months", probability: "35%" },
-                    { time: "2 years", probability: "60%" },
-                    { time: "10 years", probability: "80%" }
+                    { time: "1 month", probability: "80%" },
+                    { time: "6 months", probability: "60%" },
+                    { time: "2 years", probability: "35%" },
+                    { time: "10 years", probability: "15%" }
                 ]
             }
         ]

@@ -88,15 +88,33 @@ class SurveyLogic {
                     // Use logarithmic time normalization for doom assessment (like metalog test)
                     const normalizedX = this.metalogUtils.timeToNormalized(timeYears);
                     
+                    let probabilityValue = this.metalogUtils.parseProbabilityInput(item.probability);
+                    
+                    // Transform survival functions: store as CDF (1-survival) for fitting
+                    if (tableConfig.probabilityType === "survival") {
+                        probabilityValue = 1 - probabilityValue;
+                    }
+                    
                     return {
                         x: normalizedX,
-                        y: this.metalogUtils.parseProbabilityInput(item.probability)
+                        y: probabilityValue
                     };
                 });
                 this.tableStates[tableConfig.id] = normalizedData;
             });
             console.log("📊 Initialized doom assessment states:", Object.keys(this.tableStates).filter(id => id.includes('assessment')));
         }
+    }
+
+    // Check if a table uses survival function (decreasing) semantics
+    isSurvivalTable(tableId) {
+        // Check if this table is defined in any config with probabilityType: "survival"
+        const allConfigs = [
+            ...(SURVEY_CONFIG.doomAssessmentCard?.tables || [])
+        ];
+        
+        const config = allConfigs.find(table => table.id === tableId);
+        return config?.probabilityType === "survival";
     }
 
     // Linear year conversion functions for timeline tables
@@ -202,7 +220,12 @@ class SurveyLogic {
                     cell.textContent = this.metalogUtils.formatTime(timeYears);
                 }
             } else if (field === 'y') {
-                cell.textContent = (point.y * 100).toFixed(0) + '%';
+                // Transform stored value back to user display format
+                let displayY = point.y;
+                if (this.isSurvivalTable(tableId)) {
+                    displayY = 1 - point.y;  // Convert CDF → survival for display
+                }
+                cell.textContent = (displayY * 100).toFixed(0) + '%';
             }
             cell.dataset.originalValue = cell.textContent;
         }
@@ -333,12 +356,17 @@ class SurveyLogic {
     // Change probability operation (invariants.md: change prob)
     changeProb(tableId, rowIndex, newProbStr, cell) {
         // 1. Attempt to parse probability
-        const newProb = this.parseProb(newProbStr);
+        let newProb = this.parseProb(newProbStr);
 
         // 2. If parse fails, revert and return
         if (newProb === null) {
             this.revertCellDisplay(cell, tableId, rowIndex, 'y');
             return;
+        }
+
+        // 3. Transform survival functions before validation/storage
+        if (this.isSurvivalTable(tableId)) {
+            newProb = 1 - newProb;  // Convert survival → CDF for storage
         }
 
         const tableData = this.getTableState(tableId);
@@ -444,7 +472,13 @@ class SurveyLogic {
                 timeStr = this.metalogUtils.formatTime(timeYears);
             }
             
-            const probStr = (point.y * 100).toFixed(0) + "%";
+            // Transform stored value back to user display format
+            let displayY = point.y;
+            if (this.isSurvivalTable(tableId)) {
+                displayY = 1 - point.y;  // Convert CDF → survival for display
+            }
+            
+            const probStr = (displayY * 100).toFixed(0) + "%";
 
             const row = document.createElement("tr");
             row.dataset.row = index;
@@ -712,6 +746,20 @@ class SurveyLogic {
         `;
     }
 
+    createCommentBox(commentConfig) {
+        return `
+            <div class="comment-section">
+                <h4>Additional Comments</h4>
+                <p class="comment-prompt">${commentConfig.prompt}</p>
+                <textarea 
+                    class="comment-textarea"
+                    placeholder="Your comments here..."
+                    rows="4"
+                ></textarea>
+            </div>
+        `;
+    }
+
     createMetalogTestCard(card, container) {
         container.innerHTML = `
             <div class="info-card">
@@ -719,6 +767,7 @@ class SurveyLogic {
                 ${card.content}
                 ${card.showTable ? this.createMetalogDataTable() : ""}
                 ${card.showMultipleTables ? this.createMultiTableContainer(card) : ""}
+                ${card.commentBox?.enabled ? this.createCommentBox(card.commentBox) : ""}
             </div>
         `;
 
@@ -1027,12 +1076,25 @@ class SurveyLogic {
             
             if (distribution.type === 'metalog') {
                 console.log(`✅ ${tableName} - Metalog fitting succeeded`);
-                const plotData = this.metalogUtils.distributionModule.getPlotData(distribution, 200);
+                let plotData = this.metalogUtils.distributionModule.getPlotData(distribution, 200);
+                
+                // Transform back to survival function for display
+                if (this.isSurvivalTable(tableId)) {
+                    plotData = plotData.map(point => ({ x: point.x, y: 1 - point.y }));
+                }
+                
                 this.visualizer.drawMetalogCurve(plotData, tableName, index);
                 this.updateTableStatus(tableId, `Metalog fit (k=${distribution.metalog.numTerms})`, false);
             } else if (distribution.type === 'interpolation') {
                 console.log(`⚠️ ${tableName} - Using interpolation`);
-                this.visualizer.drawPiecewiseLinearCurve(distribution.points, tableName, index);
+                let interpolationData = distribution.points;
+                
+                // Transform back to survival function for display
+                if (this.isSurvivalTable(tableId)) {
+                    interpolationData = interpolationData.map(point => ({ x: point.x, y: 1 - point.y }));
+                }
+                
+                this.visualizer.drawPiecewiseLinearCurve(interpolationData, tableName, index);
                 this.updateTableStatus(tableId, "Linear interpolation", false);
             }
 

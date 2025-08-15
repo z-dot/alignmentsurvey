@@ -77,6 +77,41 @@ function sampleMetalog(distribution, numPoints) {
         }
     }
     
+    // Extend curve to reach x-axis boundaries (0 and 1)
+    // This fixes the issue where metalog curves don't span the full time range
+    
+    if (data.length > 0) {
+        // Extend toward x=0 (early times)
+        const firstPoint = data[0];
+        let y_extend = firstPoint.y;
+        
+        while (y_extend > 1e-10) { // Avoid numerical issues at y=0
+            y_extend = y_extend / 2;
+            const x_extend = evaluateMetalog(metalog, y_extend);
+            
+            if (isFinite(x_extend)) {
+                data.unshift({ x: x_extend, y: y_extend }); // Add to beginning
+            } else {
+                break; // Hit invalid region
+            }
+        }
+        
+        // Extend toward x=1 (late times)
+        const lastPoint = data[data.length - 1];
+        let y_extend2 = lastPoint.y;
+        
+        while (y_extend2 < 0.999999) { // Avoid numerical issues at y=1
+            y_extend2 = (1 + y_extend2) / 2;
+            const x_extend = evaluateMetalog(metalog, y_extend2);
+            
+            if (isFinite(x_extend)) {
+                data.push({ x: x_extend, y: y_extend2 }); // Add to end
+            } else {
+                break; // Hit invalid region
+            }
+        }
+    }
+    
     return data;
 }
 
