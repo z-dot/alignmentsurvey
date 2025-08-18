@@ -85,13 +85,6 @@ class SurveyCoordinator {
     initializeDefaultTables() {
         console.log('📋 Initializing default tables from config');
         
-        // Metalog test table
-        if (SURVEY_CONFIG.metalogTestCard?.defaultData) {
-            this.tableManager.initializeTable('metalog-test', 
-                SURVEY_CONFIG.metalogTestCard.defaultData, 
-                { mode: 'duration', title: 'Metalog Test' }
-            );
-        }
         
         // AI Timeline tables
         if (SURVEY_CONFIG.aiTimelinesCard?.tables) {
@@ -267,12 +260,6 @@ class SurveyCoordinator {
             case "intro":
                 this.createInfoCards(currentItem.item);
                 break;
-            case "example":
-                this.createExampleCards(currentItem.item);
-                break;
-            case "metalogTest":
-                this.createTableCards(currentItem.item, ['metalog-test']);
-                break;
             case "aiTimelines":
                 this.createTimelineCards(currentItem.item);
                 break;
@@ -305,12 +292,6 @@ class SurveyCoordinator {
         this.currentCardsContainer.appendChild(card);
     }
     
-    /**
-     * Create example cards
-     */
-    createExampleCards(item) {
-        this.createInfoCards(item); // Same as info cards
-    }
     
     /**
      * Create cards with tables
@@ -498,9 +479,11 @@ class SurveyCoordinator {
             row.dataset.row = index;
             row.innerHTML = `
                 <td class="time-cell" contenteditable="true" data-type="time" 
-                    onblur="surveyCoordinator.handleCellEdit(this, '${tableId}')">${timeStr}</td>
+                    onblur="surveyCoordinator.handleCellEdit(this, '${tableId}')"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${timeStr}</td>
                 <td class="prob-cell" contenteditable="true" data-type="probability" 
-                    onblur="surveyCoordinator.handleCellEdit(this, '${tableId}')">${probStr}</td>
+                    onblur="surveyCoordinator.handleCellEdit(this, '${tableId}')"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${probStr}</td>
                 <td><button class="remove-btn" onclick="surveyCoordinator.removeRow('${tableId}', ${index})">×</button></td>
             `;
             
@@ -654,10 +637,12 @@ class SurveyCoordinator {
      * Toggle Y-axis transformation
      */
     toggleYAxis() {
+        // Chart renderer now handles curve transformations internally
         this.chartRenderer.setYTransformation(
             this.chartRenderer.yAxisTransformed ? 'linear' : 'cube'
         );
     }
+
 
     // === DATA EXPORT ===
     

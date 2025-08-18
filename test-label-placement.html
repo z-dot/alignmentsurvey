@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Label Placement LP Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Label Placement Linear Program Test</h1>
+        
+        <div class="test-section">
+            <h3>Module Loading Test</h3>
+            <div id="module-test"></div>
+            <button onclick="testModuleLoading()">Test Module Loading</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>Simplex Solver Test</h3>
+            <div id="simplex-test"></div>
+            <button onclick="testSimplexSolver()">Test Simplex Solver</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>Label Placement Test</h3>
+            <div id="placement-test"></div>
+            <button onclick="testLabelPlacement()">Test Label Placement</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>Animation Test</h3>
+            <div id="animation-test"></div>
+            <button onclick="testAnimation()">Test Animation</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>Integration Test</h3>
+            <div id="integration-test"></div>
+            <button onclick="testIntegration()">Test Full Integration</button>
+        </div>
+    </div>
+
+    <!-- Include the modules -->
+    <script src="core/simplex-solver.js"></script>
+    <script src="core/label-placement-lp.js"></script>
+    
+    <script>
+        function addResult(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            container.appendChild(div);
+        }
+
+        function clearResults(containerId) {
+            document.getElementById(containerId).innerHTML = '';
+        }
+
+        function testModuleLoading() {
+            clearResults('module-test');
+            
+            try {
+                // Test SimplexSolver
+                if (typeof SimplexSolver !== 'undefined') {
+                    addResult('module-test', '✅ SimplexSolver loaded successfully', 'success');
+                } else {
+                    addResult('module-test', '❌ SimplexSolver not found', 'error');
+                }
+                
+                // Test LabelPlacementLP
+                if (typeof LabelPlacementLP !== 'undefined') {
+                    addResult('module-test', '✅ LabelPlacementLP loaded successfully', 'success');
+                } else {
+                    addResult('module-test', '❌ LabelPlacementLP not found', 'error');
+                }
+                
+                // Test instantiation
+                const solver = new SimplexSolver();
+                const lpSolver = new LabelPlacementLP();
+                addResult('module-test', '✅ Both modules can be instantiated', 'success');
+                
+            } catch (error) {
+                addResult('module-test', `❌ Module loading error: ${error.message}`, 'error');
+            }
+        }
+
+        function testSimplexSolver() {
+            clearResults('simplex-test');
+            
+            try {
+                const solver = new SimplexSolver({debug: false});
+                
+                // Simple test problem: minimize x + y subject to x + y >= 1, x >= 0, y >= 0
+                // Solution should be x = 1, y = 0 (or x = 0, y = 1) with objective = 1
+                
+                const objective = [1, 1]; // minimize x + y
+                const constraints = [
+                    [1, 1]  // x + y >= 1
+                ];
+                const bounds = [
+                    {type: '>=', value: 1}
+                ];
+                const variableBounds = [
+                    {lower: 0, upper: Infinity},
+                    {lower: 0, upper: Infinity}
+                ];
+                
+                const result = solver.solve(objective, constraints, bounds, variableBounds);
+                
+                addResult('simplex-test', `Solver status: ${result.status}`, 
+                    result.status === 'optimal' ? 'success' : 'error');
+                
+                if (result.status === 'optimal') {
+                    addResult('simplex-test', 
+                        `Solution: x=${result.variables[0].toFixed(3)}, y=${result.variables[1].toFixed(3)}`, 'info');
+                    addResult('simplex-test', 
+                        `Objective value: ${result.objective.toFixed(3)}`, 'info');
+                    addResult('simplex-test', 
+                        `Iterations: ${result.iterations}`, 'info');
+                    
+                    // Check if solution is approximately correct
+                    const sum = result.variables[0] + result.variables[1];
+                    if (Math.abs(sum - 1) < 1e-6 && Math.abs(result.objective - 1) < 1e-6) {
+                        addResult('simplex-test', '✅ Solution is correct!', 'success');
+                    } else {
+                        addResult('simplex-test', '⚠️ Solution may be incorrect', 'error');
+                    }
+                }
+                
+            } catch (error) {
+                addResult('simplex-test', `❌ Simplex test error: ${error.message}`, 'error');
+                console.error('Simplex test error:', error);
+            }
+        }
+
+        function testLabelPlacement() {
+            clearResults('placement-test');
+            
+            try {
+                const lpSolver = new LabelPlacementLP();
+                
+                // Test with multiple overlapping labels
+                const labels = [
+                    {desiredY: 100, height: 20, weight: 1, id: 'label1'},
+                    {desiredY: 105, height: 20, weight: 1, id: 'label2'},
+                    {desiredY: 110, height: 20, weight: 2, id: 'label3'}, // Higher weight
+                    {desiredY: 200, height: 25, weight: 1, id: 'label4'},
+                    {desiredY: 205, height: 15, weight: 1, id: 'label5'}
+                ];
+                
+                const bounds = {
+                    top: 10,
+                    bottom: 300,
+                    gap: 2 // Much smaller gap
+                };
+                
+                addResult('placement-test', `Testing with ${labels.length} labels`, 'info');
+                addResult('placement-test', `Bounds: top=${bounds.top}, bottom=${bounds.bottom}, gap=${bounds.gap}`, 'info');
+                
+                // Test with hard constraints
+                const hardSolution = lpSolver.solveLabelPlacement(labels, bounds, {softConstraints: false});
+                addResult('placement-test', `Hard constraints solution: ${hardSolution.length} positions`, 
+                    hardSolution.length === labels.length ? 'success' : 'error');
+                
+                // Test with soft constraints
+                const softSolution = lpSolver.solveLabelPlacement(labels, bounds, {softConstraints: true});
+                addResult('placement-test', `Soft constraints solution: ${softSolution.length} positions`, 
+                    softSolution.length === labels.length ? 'success' : 'error');
+                
+                // Display solutions
+                if (hardSolution.length > 0) {
+                    const hardStr = hardSolution.map(s => `${s.id}: y=${s.y.toFixed(1)}`).join(', ');
+                    addResult('placement-test', `Hard solution: ${hardStr}`, 'info');
+                }
+                
+                if (softSolution.length > 0) {
+                    const softStr = softSolution.map(s => `${s.id}: y=${s.y.toFixed(1)}`).join(', ');
+                    addResult('placement-test', `Soft solution: ${softStr}`, 'info');
+                }
+                
+                // Validate no overlaps in solution
+                if (softSolution.length > 1) {
+                    let hasOverlap = false;
+                    for (let i = 1; i < softSolution.length; i++) {
+                        const prev = softSolution[i-1];
+                        const curr = softSolution[i];
+                        const prevLabel = labels.find(l => l.id === prev.id);
+                        const currLabel = labels.find(l => l.id === curr.id);
+                        
+                        if (prevLabel && currLabel) {
+                            const minSeparation = (prevLabel.height + currLabel.height) / 2 + bounds.gap;
+                            const actualSeparation = Math.abs(curr.y - prev.y);
+                            
+                            if (actualSeparation < minSeparation - 1e-6) {
+                                hasOverlap = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    addResult('placement-test', 
+                        hasOverlap ? '⚠️ Found overlapping labels' : '✅ No overlapping labels', 
+                        hasOverlap ? 'error' : 'success');
+                }
+                
+            } catch (error) {
+                addResult('placement-test', `❌ Label placement test error: ${error.message}`, 'error');
+                console.error('Label placement test error:', error);
+            }
+        }
+
+        function testAnimation() {
+            clearResults('animation-test');
+            
+            try {
+                const lpSolver = new LabelPlacementLP();
+                
+                const oldPositions = [
+                    {id: 'label1', y: 100},
+                    {id: 'label2', y: 150},
+                    {id: 'label3', y: 200}
+                ];
+                
+                const newPositions = [
+                    {id: 'label1', y: 120},
+                    {id: 'label2', y: 160},
+                    {id: 'label3', y: 180}
+                ];
+                
+                addResult('animation-test', 'Starting animation test...', 'info');
+                
+                // Listen for animation updates
+                let updateCount = 0;
+                const handleUpdate = (event) => {
+                    updateCount++;
+                    if (updateCount % 10 === 0) { // Log every 10th update
+                        addResult('animation-test', 
+                            `Animation progress: ${(event.detail.progress * 100).toFixed(1)}%`, 'info');
+                    }
+                };
+                
+                window.addEventListener('labelPositionUpdate', handleUpdate);
+                
+                // Start animation (short duration for testing)
+                lpSolver.animateToNewPositions(oldPositions, newPositions, 200)
+                    .then(() => {
+                        window.removeEventListener('labelPositionUpdate', handleUpdate);
+                        addResult('animation-test', 
+                            `✅ Animation completed with ${updateCount} updates`, 'success');
+                    })
+                    .catch((error) => {
+                        window.removeEventListener('labelPositionUpdate', handleUpdate);
+                        addResult('animation-test', `❌ Animation error: ${error.message}`, 'error');
+                    });
+                
+            } catch (error) {
+                addResult('animation-test', `❌ Animation test error: ${error.message}`, 'error');
+            }
+        }
+
+        function testIntegration() {
+            clearResults('integration-test');
+            
+            try {
+                addResult('integration-test', 'Testing full integration scenario...', 'info');
+                
+                // Simulate a chart rendering scenario
+                const lpSolver = new LabelPlacementLP();
+                
+                // Labels at curve endpoints (simulated)
+                const curveEndpoints = [0.1, 0.3, 0.35, 0.4, 0.7, 0.9]; // Normalized Y positions
+                const chartHeight = 300;
+                
+                const labels = curveEndpoints.map((yNorm, i) => ({
+                    desiredY: yNorm * chartHeight,
+                    height: 16,
+                    weight: 1,
+                    id: `curve-${i}`,
+                    text: `Curve ${i + 1}`
+                }));
+                
+                const bounds = {
+                    top: 10,
+                    bottom: chartHeight - 10,
+                    gap: 4
+                };
+                
+                addResult('integration-test', 
+                    `Placing ${labels.length} labels in ${chartHeight}px height`, 'info');
+                
+                // Check feasibility
+                const totalHeight = labels.reduce((sum, l) => sum + l.height, 0);
+                const totalGaps = (labels.length - 1) * bounds.gap;
+                const availableSpace = bounds.bottom - bounds.top;
+                const feasible = totalHeight + totalGaps <= availableSpace;
+                
+                addResult('integration-test', 
+                    `Feasibility: ${feasible ? 'feasible' : 'infeasible'} ` +
+                    `(need ${totalHeight + totalGaps}px, have ${availableSpace}px)`, 
+                    feasible ? 'success' : 'info');
+                
+                // Solve placement
+                const solution = lpSolver.solveLabelPlacement(labels, bounds, {
+                    softConstraints: true,
+                    tieBreakEpsilon: 1e-6
+                });
+                
+                if (solution.length === labels.length) {
+                    addResult('integration-test', '✅ All labels placed successfully', 'success');
+                    
+                    // Calculate total movement
+                    let totalMovement = 0;
+                    for (const pos of solution) {
+                        const label = labels.find(l => l.id === pos.id);
+                        if (label) {
+                            totalMovement += Math.abs(pos.y - label.desiredY);
+                        }
+                    }
+                    
+                    addResult('integration-test', 
+                        `Total movement: ${totalMovement.toFixed(1)}px`, 'info');
+                    
+                    // Test Y-axis transformation simulation
+                    const transformedLabels = labels.map(l => ({
+                        ...l,
+                        desiredY: Math.pow(l.desiredY / chartHeight, 0.4) * chartHeight // Cube root transform
+                    }));
+                    
+                    const transformedSolution = lpSolver.solveLabelPlacement(transformedLabels, bounds, {
+                        softConstraints: true
+                    });
+                    
+                    if (transformedSolution.length === labels.length) {
+                        addResult('integration-test', 
+                            '✅ Y-axis transformation handling works', 'success');
+                    } else {
+                        addResult('integration-test', 
+                            '⚠️ Y-axis transformation failed', 'error');
+                    }
+                    
+                } else {
+                    addResult('integration-test', 
+                        `❌ Only ${solution.length}/${labels.length} labels placed`, 'error');
+                }
+                
+            } catch (error) {
+                addResult('integration-test', `❌ Integration test error: ${error.message}`, 'error');
+                console.error('Integration test error:', error);
+            }
+        }
+
+        // Auto-run module loading test on page load
+        window.addEventListener('load', () => {
+            setTimeout(testModuleLoading, 100);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+{
+  "surveyProgress": {
+    "currentStep": 6,
+    "totalSteps": 7,
+    "completedCount": 6,
+    "progressPercent": 100
+  },
+  "tables": {
+    "metalog-test": {
+      "data": [
+        {
+          "x": 0.561652504050468,
+          "y": 0.25
+        },
+        {
+          "x": 0.780826252025234,
+          "y": 0.5
+        },
+        {
+          "x": 0.9340221275974977,
+          "y": 0.75
+        }
+      ],
+      "context": {
+        "mode": "duration",
+        "isSurvival": false,
+        "title": "Metalog Test"
+      }
+    },
+    "sc-timeline": {
+      "data": [
+        {
+          "x": 0.075,
+          "y": 0.1
+        },
+        {
+          "x": 0.25,
+          "y": 0.3
+        },
+        {
+          "x": 0.625,
+          "y": 0.6
+        },
+        {
+          "x": 1,
+          "y": 0.8
+        }
+      ],
+      "context": {
+        "mode": "timeline",
+        "isSurvival": false,
+        "title": "Superhuman Coder (SC)"
+      }
+    },
+    "sar-timeline": {
+      "data": [
+        {
+          "x": 0.125,
+          "y": 0.1
+        },
+        {
+          "x": 0.375,
+          "y": 0.3
+        },
+        {
+          "x": 0.75,
+          "y": 0.6
+        },
+        {
+          "x": 1,
+          "y": 0.8
+        }
+      ],
+      "context": {
+        "mode": "timeline",
+        "isSurvival": false,
+        "title": "Superhuman AI Researcher (SAR)"
+      }
+    },
+    "siar-timeline": {
+      "data": [
+        {
+          "x": 0.25,
+          "y": 0.1
+        },
+        {
+          "x": 0.5,
+          "y": 0.3
+        },
+        {
+          "x": 0.875,
+          "y": 0.6
+        },
+        {
+          "x": 1,
+          "y": 0.8
+        }
+      ],
+      "context": {
+        "mode": "timeline",
+        "isSurvival": false,
+        "title": "Superintelligent AI Researcher (SIAR)"
+      }
+    },
+    "asi-timeline": {
+      "data": [
+        {
+          "x": 0.375,
+          "y": 0.1
+        },
+        {
+          "x": 0.625,
+          "y": 0.3
+        },
+        {
+          "x": 0.875,
+          "y": 0.6
+        },
+        {
+          "x": 1,
+          "y": 0.8
+        }
+      ],
+      "context": {
+        "mode": "timeline",
+        "isSurvival": false,
+        "title": "Artificial Superintelligence (ASI)"
+      }
+    },
+    "doom-assessment": {
+      "data": [
+        {
+          "x": 0.3251243056101318,
+          "y": 0.4
+        },
+        {
+          "x": 0.49567463164796555,
+          "y": 0.65
+        },
+        {
+          "x": 0.6276303764529703,
+          "y": 0.85
+        },
+        {
+          "x": 0.780826252025234,
+          "y": 0.95
+        }
+      ],
+      "context": {
+        "mode": "duration",
+        "isSurvival": true,
+        "title": "P(doom)"
+      }
+    },
+    "misalignment-assessment": {
+      "data": [
+        {
+          "x": 0.3251243056101318,
+          "y": 0.19999999999999996
+        },
+        {
+          "x": 0.49567463164796555,
+          "y": 0.4
+        },
+        {
+          "x": 0.6276303764529703,
+          "y": 0.65
+        },
+        {
+          "x": 0.780826252025234,
+          "y": 0.85
+        }
+      ],
+      "context": {
+        "mode": "duration",
+        "isSurvival": true,
+        "title": "P(misalignment)"
+      }
+    }
+  },
+  "timestamp": "2025-08-18T15:35:38.498Z"
+}

@@ -28,6 +28,9 @@ class InitTests {
 
         console.log('🧪 Running initialization test battery...');
         
+        // Run PAVA tests
+        this.runPAVATests();
+        
         this.testConversionUtils();
         this.testMetalogUtils();
         this.testParsingEdgeCases();
@@ -277,6 +280,112 @@ class InitTests {
         window.testResults = this.testResults;
         
         return { passed, total, failed };
+    }
+
+    runPAVATests() {
+        console.log('\n🧪 PAVA Label Placement Tests...');
+        
+        if (!window.LabelPlacementPAVA) {
+            console.error('❌ LabelPlacementPAVA not available');
+            return;
+        }
+        
+        const solver = new LabelPlacementPAVA();
+        let passed = 0;
+        let failed = 0;
+        
+        // Test 1: Well-spaced labels should not move
+        console.log('\n📝 Test 1: Well-spaced labels (should not move)');
+        const test1Labels = [
+            { id: 'a', desiredY: 0.1, height: 0.05 },
+            { id: 'b', desiredY: 0.5, height: 0.05 },
+            { id: 'c', desiredY: 0.9, height: 0.05 }
+        ];
+        const test1Bounds = { top: 0, bottom: 1, gap: 0.01 };
+        
+        const result1 = solver.solveLabelPlacement(test1Labels, test1Bounds, { debug: false });
+        
+        // Check if positions are close to desired (tolerance for numerical precision)
+        const tolerance = 0.01;
+        const test1Pass = result1.length === 3 &&
+            Math.abs(result1.find(r => r.id === 'a').y - 0.1) < tolerance &&
+            Math.abs(result1.find(r => r.id === 'b').y - 0.5) < tolerance &&
+            Math.abs(result1.find(r => r.id === 'c').y - 0.9) < tolerance;
+        
+        console.log('Result:', result1);
+        console.log(test1Pass ? '✅ PASS' : '❌ FAIL');
+        test1Pass ? passed++ : failed++;
+        
+        // Test 2: Overlapping labels should be separated
+        console.log('\n📝 Test 2: Overlapping labels (should be separated)');
+        const test2Labels = [
+            { id: 'a', desiredY: 0.5, height: 0.1 },  // These all want position 0.5
+            { id: 'b', desiredY: 0.5, height: 0.1 },  // but need 0.1 height + gap
+            { id: 'c', desiredY: 0.5, height: 0.1 }
+        ];
+        const test2Bounds = { top: 0, bottom: 1, gap: 0.02 };
+        
+        const result2 = solver.solveLabelPlacement(test2Labels, test2Bounds, { debug: false });
+        
+        // Check if labels are properly separated (monotonically increasing)
+        const sorted2 = result2.sort((a, b) => a.y - b.y);
+        const test2Pass = result2.length === 3 &&
+            sorted2[0].y < sorted2[1].y &&
+            sorted2[1].y < sorted2[2].y &&
+            (sorted2[1].y - sorted2[0].y) >= 0.1 && // Height separation
+            (sorted2[2].y - sorted2[1].y) >= 0.1;
+        
+        console.log('Result:', sorted2);
+        console.log(test2Pass ? '✅ PASS' : '❌ FAIL');
+        test2Pass ? passed++ : failed++;
+        
+        // Test 3: Boundary constraints
+        console.log('\n📝 Test 3: Boundary constraints (should respect bounds)');
+        const test3Labels = [
+            { id: 'a', desiredY: -0.5, height: 0.1 }, // Wants to go below bottom
+            { id: 'b', desiredY: 1.5, height: 0.1 }   // Wants to go above top
+        ];
+        const test3Bounds = { top: 0, bottom: 1, gap: 0.01 };
+        
+        const result3 = solver.solveLabelPlacement(test3Labels, test3Bounds, { debug: false });
+        
+        // Check if positions are within bounds
+        const test3Pass = result3.length === 2 &&
+            result3.every(r => r.y >= 0.05 && r.y <= 0.95); // Within bounds considering label height
+        
+        console.log('Result:', result3);
+        console.log(test3Pass ? '✅ PASS' : '❌ FAIL');
+        test3Pass ? passed++ : failed++;
+        
+        // Test 4: Edge case - single label
+        console.log('\n📝 Test 4: Single label');
+        const test4Labels = [{ id: 'solo', desiredY: 0.3, height: 0.1 }];
+        const test4Bounds = { top: 0, bottom: 1, gap: 0.01 };
+        
+        const result4 = solver.solveLabelPlacement(test4Labels, test4Bounds, { debug: false });
+        
+        const test4Pass = result4.length === 1 &&
+            Math.abs(result4[0].y - 0.3) < tolerance;
+        
+        console.log('Result:', result4);
+        console.log(test4Pass ? '✅ PASS' : '❌ FAIL');
+        test4Pass ? passed++ : failed++;
+        
+        // Summary
+        console.log(`\n🏁 PAVA Tests Complete: ${passed} passed, ${failed} failed`);
+        
+        if (failed === 0) {
+            console.log('🎉 All PAVA tests passed!');
+        } else {
+            console.log('⚠️ Some PAVA tests failed.');
+        }
+        
+        this.testResults.push({
+            category: 'PAVA Label Placement',
+            passed,
+            failed,
+            total: passed + failed
+        });
     }
 }
 

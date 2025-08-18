@@ -7,49 +7,18 @@ const SURVEY_CONFIG = {
     introCard: {
         title: "Welcome to the AI Alignment Difficulty Survey",
         content: `
-            <p>This survey assesses opinions on: </p>
-            <ol>
-                <li> the likelihood that <strong>various alignment approaches succeed within a certain amount of time</strong>, and </li>
-                <li> the effectiveness of various <strong>governance interventions in buying time</strong> for alignment. </li>
-            </ol>
-            <p>We anticipate this survey takes only <strong>5-10 minutes</strong> to complete.</p>
+            <p>This survey assesses opinions on the likelihood that <strong>alignment approaches succeed after a certain period of burning an AI lead.</p>
+
+            <p>We anticipate this portion of the survey takes only <strong>5-10 minutes</strong> to complete.</p>
             
             <p><small><strong>Notes on using the interface:</strong> If you refresh or close the page, you will lose your progress. You should have been directed to this web app from a Google Form, which contains more context - if you've stumbled upon this page without being directed to it, please disregard.</small></p>
         `,
     },
 
-    exampleCard: {
-        title: "Example: How the Interface Works",
-        content: `
-            <p>Here's an example of what the graph on the left represents. The graph shows a sample alignment approach and intervention:</p>
-            
-            <p><strong>"Interpretability"</strong> - The S-curve shows success probability vs. research time. In this example, there's about a 30% chance of success after 10 years of focused research.</p>
-            
-            <p><strong>"Complete export controls"</strong> - The distribution shows the amount of time you might 'win' by enacting this intervention.</p>
-            
-            <p>You'll use sliders to shape these curves based on your judgment. No controls are shown here - this is just to demonstrate the visualization.</p>
-        `,
-    },
-
-    metalogTestCard: {
-        title: "Metalog Distribution Test",
-        content: `
-            <p>This slide demonstrates the new table-based input system for metalog distributions.</p>
-            
-            <p>Enter time/probability pairs in the table below. The metalog will automatically update as you modify the values.</p>
-        `,
-        showTable: true,
-        defaultData: [
-            { time: "1 year", probability: "25%" },
-            { time: "10 years", probability: "50%" },
-            { time: "50 years", probability: "75%" }
-        ]
-    },
-
     aiTimelinesCard: {
         title: "AI Capability Timelines",
         content: `
-            <p>For each AI capability milestone below, estimate the probability of its development by various time horizons.</p>
+            <p>For each AI capability milestone below (the same as used in <a href="AI 2027">https://ai-2027.com/research/takeoff-forecast</a>), estimate the probability of its development by various time horizons.</p>
             
             <p><strong>Consider:</strong> What is the cumulative probability that each capability will be achieved by the specified time?</p>
             
@@ -64,7 +33,8 @@ const SURVEY_CONFIG = {
         showMultipleTables: true,
         commentBox: {
             enabled: true,
-            prompt: "Please share any assumptions, reasoning, or additional context that influenced your timeline predictions:"
+            prompt:
+                "Please share any assumptions, reasoning, or additional context concerning your timeline predictions:",
         },
         tables: [
             {
@@ -75,30 +45,30 @@ const SURVEY_CONFIG = {
                     { time: "2028", probability: "10%" },
                     { time: "2035", probability: "30%" },
                     { time: "2050", probability: "60%" },
-                    { time: "2065", probability: "80%" }
-                ]
+                    { time: "2065", probability: "80%" },
+                ],
             },
             {
-                id: "sar-timeline", 
+                id: "sar-timeline",
                 title: "Superhuman AI Researcher (SAR)",
                 titleEditable: false,
                 defaultData: [
                     { time: "2030", probability: "10%" },
                     { time: "2040", probability: "30%" },
                     { time: "2055", probability: "60%" },
-                    { time: "2065", probability: "80%" }
-                ]
+                    { time: "2065", probability: "80%" },
+                ],
             },
             {
                 id: "siar-timeline",
-                title: "Superintelligent AI Researcher (SIAR)", 
+                title: "Superintelligent AI Researcher (SIAR)",
                 titleEditable: false,
                 defaultData: [
                     { time: "2035", probability: "10%" },
                     { time: "2045", probability: "30%" },
                     { time: "2060", probability: "60%" },
-                    { time: "2065", probability: "80%" }
-                ]
+                    { time: "2065", probability: "80%" },
+                ],
             },
             {
                 id: "asi-timeline",
@@ -108,10 +78,10 @@ const SURVEY_CONFIG = {
                     { time: "2040", probability: "10%" },
                     { time: "2050", probability: "30%" },
                     { time: "2060", probability: "60%" },
-                    { time: "2065", probability: "80%" }
-                ]
-            }
-        ]
+                    { time: "2065", probability: "80%" },
+                ],
+            },
+        ],
     },
 
     // P(doom) and P(misalignment) assessment based on AI 2027 scenario
@@ -120,23 +90,22 @@ const SURVEY_CONFIG = {
         content: `
             <div class="info-card">
                 <h4>AI 2027 Scenario Context</h4>
-                <p>Consider the <a href="https://ai-2027.com/#narrative-2027-09-30" target="_blank">AI 2027 scenario</a> as described in the narrative through September 2027. You are now making assessments conditioning on the observations about alignment, capabilities, governance, and other factors described in that scenario.</p>
+                <p>Suppose we are in <a href="https://ai-2027.com/#narrative-2027-09-30" target="_blank">September 2027 as outline in AI 2027</a>, and the observations about capabilities, alignment, compute, governance, etc. are as they are in the scenario.</p>
                 
                 <h4>Assessment Question</h4>
-                <p><strong>If humanity were to "burn the lead" for X amount of time</strong> (meaning we continue developing AI capabilities without substantially improving alignment or governance), what are your probability assessments for the following outcomes?</p>
+                <p><strong>If humanity were to burn its lead for X amount of time</strong> (working on alignment and other safety measures without advancing the frontier), what are your probability assessments for the following outcomes? (Assume that conditions are such that work on alignment can proceed smoothly, with resources normally devoted to advancing capabilities being dedicated to safety and inference. This could be as a result of a unilateral pause from the leading lab, a bilateral treaty, or an international regulator.)</p>
                 
                 <h4>Definitions</h4>
                 <p><strong>P(doom):</strong> Probability that humanity faces existential catastrophe or permanent disempowerment due to AI.</p>
                 
-                <p><strong>P(misalignment):</strong> Probability that we end up in the "second attractor state" where AIs are pretending to be aligned but are actually growing in power and subverting the system, while humans mistakenly believe they are in control.</p>
-                
-                <p><em>Note: P(misalignment) may be higher than P(doom) since misalignment doesn't necessarily lead to doom, but doom typically requires misalignment.</em></p>
-            </div>
+                <p><strong>P(misalignment):</strong> Probability that we end up in a world where AIs are pretending to be aligned but are actually growing in power and subverting the system, while humans mistakenly believe they are in control.</p>
+                            </div>
         `,
         showMultipleTables: true,
         commentBox: {
             enabled: true,
-            prompt: "Please share any assumptions, reasoning, or additional context that influenced your P(doom) and P(misalignment) assessments:"
+            prompt:
+                "Please share any assumptions, reasoning, or additional context that influenced your P(doom) and P(misalignment) assessments:",
         },
         tables: [
             {
@@ -148,11 +117,11 @@ const SURVEY_CONFIG = {
                     { time: "1 month", probability: "60%" },
                     { time: "6 months", probability: "35%" },
                     { time: "2 years", probability: "15%" },
-                    { time: "10 years", probability: "5%" }
-                ]
+                    { time: "10 years", probability: "5%" },
+                ],
             },
             {
-                id: "misalignment-assessment", 
+                id: "misalignment-assessment",
                 title: "P(misalignment)",
                 titleEditable: false,
                 probabilityType: "survival",
@@ -160,10 +129,10 @@ const SURVEY_CONFIG = {
                     { time: "1 month", probability: "80%" },
                     { time: "6 months", probability: "60%" },
                     { time: "2 years", probability: "35%" },
-                    { time: "10 years", probability: "15%" }
-                ]
-            }
-        ]
+                    { time: "10 years", probability: "15%" },
+                ],
+            },
+        ],
     },
 
     approachesTitle: {
@@ -197,26 +166,29 @@ const SURVEY_CONFIG = {
         {
             id: "prosaic",
             title: "Prosaic alignment",
-            description: "Alignment techniques that work with current AI paradigms and scaling",
+            description:
+                "Alignment techniques that work with current AI paradigms and scaling",
             maxProb: 0.7,
             steepness: 0.5,
-            inflection: 0.6 // Will be converted to normalized time
+            inflection: 0.6, // Will be converted to normalized time
         },
         {
-            id: "human-uplift", 
+            id: "human-uplift",
             title: "Human uplift",
-            description: "Enhancing human intelligence and capabilities to keep pace with AI",
+            description:
+                "Enhancing human intelligence and capabilities to keep pace with AI",
             maxProb: 0.6,
             steepness: 0.3,
-            inflection: 0.7
+            inflection: 0.7,
         },
         {
             id: "alignment-theory",
-            title: "Alignment theory", 
-            description: "Developing theoretical foundations for AI alignment before implementation",
+            title: "Alignment theory",
+            description:
+                "Developing theoretical foundations for AI alignment before implementation",
             maxProb: 0.8,
             steepness: 0.4,
-            inflection: 0.5
+            inflection: 0.5,
         },
     ],
 
@@ -224,38 +196,46 @@ const SURVEY_CONFIG = {
         {
             id: "leading-lab-pauses",
             title: "Leading lab pauses",
-            description: "Major AI labs voluntarily pausing development at critical capability thresholds",
+            description:
+                "Major AI labs voluntarily pausing development at critical capability thresholds",
             mean: 0.4,
-            std: 0.2
+            std: 0.2,
         },
         {
             id: "maiming",
             title: "MAIMing",
-            description: "Mutually Assured Information Mining - information sharing agreements between AI labs",
+            description:
+                "Mutually Assured Information Mining - information sharing agreements between AI labs",
             mean: 0.3,
-            std: 0.15
+            std: 0.15,
         },
         {
             id: "bilateral-treaty",
             title: "Bilateral treaty",
-            description: "Government-to-government agreements on AI development and deployment",
+            description:
+                "Government-to-government agreements on AI development and deployment",
             mean: 0.6,
-            std: 0.25
+            std: 0.25,
         },
         {
             id: "iaea-ai",
             title: "IAEA for AI",
-            description: "International regulatory body for AI development similar to nuclear oversight",
+            description:
+                "International regulatory body for AI development similar to nuclear oversight",
             mean: 0.8,
-            std: 0.3
+            std: 0.3,
         },
     ],
 
     // Page-table mapping: defines which tables belong to which survey page
     pageTableMapping: {
-        "metalogTest": ["metalog-test"],
-        "aiTimelines": ["sc-timeline", "sar-timeline", "siar-timeline", "asi-timeline"],
+        "aiTimelines": [
+            "sc-timeline",
+            "sar-timeline",
+            "siar-timeline",
+            "asi-timeline",
+        ],
         "doomAssessment": ["doom-assessment", "misalignment-assessment"],
-        "review": "all" // Special case: show all tables
+        "review": "all", // Special case: show all tables
     },
 };

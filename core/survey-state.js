@@ -66,28 +66,16 @@ class SurveyState extends EventTarget {
             case 0:
                 return { type: "intro", item: SURVEY_CONFIG.introCard };
             case 1:
-                return { type: "example", item: SURVEY_CONFIG.exampleCard };
-            case 2:
-                return {
-                    type: "metalogTest",
-                    item: SURVEY_CONFIG.metalogTestCard,
-                };
-            case 3:
                 return {
                     type: "aiTimelines", 
                     item: SURVEY_CONFIG.aiTimelinesCard,
                 };
-            case 4:
+            case 2:
                 return {
                     type: "doomAssessment",
                     item: SURVEY_CONFIG.doomAssessmentCard,
                 };
-            case 5:
-                return {
-                    type: "review",
-                    item: { title: "Review Your Distribution" },
-                };
-            case 6:
+            case 3:
             default:
                 return { type: "final", item: { title: "Survey Complete" } };
         }
