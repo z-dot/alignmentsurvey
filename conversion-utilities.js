@@ -56,6 +56,10 @@ class ConversionUtils {
 
     // Absolute year parsing - for timeline slides like "2025", "2027.5"
     parseAbsoluteYear(yearStr) {
+        if (yearStr === undefined || yearStr === null || typeof yearStr !== 'string') {
+            console.warn('parseAbsoluteYear received invalid input:', yearStr);
+            return null;
+        }
         const cleaned = yearStr.trim();
         const number = parseFloat(cleaned);
         

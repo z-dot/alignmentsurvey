@@ -617,6 +617,21 @@
         <div class="header">
             <h2>AI Futures alignment difficulty survey</h2>
         </div>
+        
+        <!-- Load Existing Data Section (initially hidden) -->
+        <div id="loadDataSection" class="load-data-section" style="display: none;">
+            <div class="card" style="margin-bottom: 20px; border: 2px solid #2A623D;">
+                <h3>Load Existing Survey Data</h3>
+                <p>Paste your survey data below to continue from where you left off:</p>
+                <textarea id="dataLoadTextarea" placeholder="Paste your JSON survey data here..." rows="6" style="width: 100%; font-family: monospace; font-size: 12px; margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+                <div style="text-align: center; margin: 15px 0;">
+                    <button id="loadDataBtn" class="button">Load Data & Continue Survey</button>
+                    <button id="cancelLoadBtn" class="button" style="background-color: #666; margin-left: 10px;">Cancel</button>
+                </div>
+                <div id="loadDataMessage" style="margin-top: 10px;"></div>
+            </div>
+        </div>
+        
         <div class="main-content">
             <div class="chart-container">
                 <div style="text-align: center; margin-bottom: 10px;">
@@ -707,10 +722,100 @@
                 // Initialize the new system
                 surveyCoordinator = new SurveyCoordinator();
                 
+                // Set up load data functionality
+                setupLoadDataHandlers();
+                
+                // Check for ?load parameter and auto-show modal
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has('load')) {
+                    document.getElementById('loadDataSection').style.display = 'block';
+                }
+                
                 console.log('✅ New architecture initialized successfully');
             } catch (error) {
                 console.error('❌ Failed to initialize new architecture:', error);
                 alert('Failed to load survey. Please refresh the page.');
+            }
+            
+            function setupLoadDataHandlers() {
+                const loadSection = document.getElementById('loadDataSection');
+                const loadDataBtn = document.getElementById('loadDataBtn');
+                const cancelLoadBtn = document.getElementById('cancelLoadBtn');
+                const textarea = document.getElementById('dataLoadTextarea');
+                const messageDiv = document.getElementById('loadDataMessage');
+                
+                // Cancel loading
+                cancelLoadBtn.addEventListener('click', () => {
+                    loadSection.style.display = 'none';
+                    textarea.value = '';
+                    messageDiv.innerHTML = '';
+                });
+                
+                // Load data
+                loadDataBtn.addEventListener('click', () => {
+                    const jsonText = textarea.value.trim();
+                    if (!jsonText) {
+                        showLoadMessage('Please paste some JSON data first.', 'error');
+                        return;
+                    }
+                    
+                    try {
+                        const data = JSON.parse(jsonText);
+                        loadSurveyData(data);
+                    } catch (error) {
+                        showLoadMessage(`Error parsing JSON: ${error.message}`, 'error');
+                    }
+                });
+                
+                function showLoadMessage(message, type = 'info') {
+                    const className = type === 'error' ? 'error-message' : 'success-message';
+                    messageDiv.innerHTML = `<div style="color: ${type === 'error' ? '#dc3545' : '#155724'}; background: ${type === 'error' ? '#f8d7da' : '#d4edda'}; border: 1px solid ${type === 'error' ? '#f5c6cb' : '#c3e6cb'}; border-radius: 4px; padding: 10px; margin: 10px 0;">${message}</div>`;
+                }
+                
+                function loadSurveyData(data) {
+                    try {
+                        // Load tables
+                        if (data.tables) {
+                            for (const [tableId, tableData] of Object.entries(data.tables)) {
+                                if (tableData.data && Array.isArray(tableData.data) && tableData.data.length > 0) {
+                                    // Data is already normalized from export
+                                    surveyCoordinator.tableManager.tableStates[tableId] = [...tableData.data];
+                                    surveyCoordinator.tableManager.tableContexts[tableId] = tableData.context || {};
+                                }
+                            }
+                        }
+                        
+                        // Load comments
+                        if (data.comments) {
+                            for (const [stepType, comment] of Object.entries(data.comments)) {
+                                surveyCoordinator.surveyState.comments.set(stepType, comment);
+                            }
+                        }
+                        
+                        // Go to step 1 (AI Timelines) to show data but allow navigation
+                        surveyCoordinator.surveyState.goToStep(1);
+                        
+                        // Hide load section
+                        loadSection.style.display = 'none';
+                        
+                        // Show temporary success message at top of page
+                        const successDiv = document.createElement('div');
+                        successDiv.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 4px; padding: 10px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
+                        successDiv.textContent = `✅ Survey data loaded with ${Object.keys(data.tables || {}).length} tables!`;
+                        document.body.appendChild(successDiv);
+                        
+                        // Remove success message after 3 seconds
+                        setTimeout(() => {
+                            document.body.removeChild(successDiv);
+                        }, 3000);
+                        
+                        console.log('🎉 Survey data loaded successfully');
+                        
+                    } catch (error) {
+                        showLoadMessage(`Error loading data: ${error.message}`, 'error');
+                        console.error('Load data error:', error);
+                    }
+                }
             }
         });
     </script>

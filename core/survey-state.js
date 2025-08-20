@@ -36,6 +36,9 @@ class SurveyState extends EventTarget {
         this.completedSteps = new Set();
         this.everCompleted = new Set(); // Track steps that have been visited
         
+        // Comments state - map step type to comment text
+        this.comments = new Map();
+        
         // Validation
         if (typeof SURVEY_CONFIG === 'undefined') {
             throw new Error('SurveyState requires SURVEY_CONFIG to be loaded');
@@ -219,6 +222,59 @@ class SurveyState extends EventTarget {
      */
     isComplete() {
         return this.currentStep === this.getTotalSteps() - 1;
+    }
+    
+    // === COMMENTS MANAGEMENT ===
+    
+    /**
+     * Set comment for current step
+     */
+    setComment(commentText) {
+        const currentItem = this.getCurrentItem();
+        if (currentItem && currentItem.type) {
+            // Only save comments for step types that actually have comment boxes
+            const stepTypesWithComments = ['aiTimelines', 'doomAssessment'];
+            if (!stepTypesWithComments.includes(currentItem.type)) {
+                console.warn(`⚠️ Attempted to save comment for step type '${currentItem.type}' which has no comment box`);
+                return;
+            }
+            
+            this.comments.set(currentItem.type, commentText);
+            console.log(`💬 Comment saved for step '${currentItem.type}':`, commentText.substring(0, 50) + (commentText.length > 50 ? '...' : ''));
+            
+            // Emit event
+            this.dispatchEvent(new CustomEvent('comment-changed', {
+                detail: { 
+                    stepType: currentItem.type,
+                    comment: commentText 
+                }
+            }));
+        }
+    }
+    
+    /**
+     * Get comment for current step
+     */
+    getComment() {
+        const currentItem = this.getCurrentItem();
+        if (currentItem && currentItem.type) {
+            return this.comments.get(currentItem.type) || '';
+        }
+        return '';
+    }
+    
+    /**
+     * Get comment for specific step type
+     */
+    getCommentForStep(stepType) {
+        return this.comments.get(stepType) || '';
+    }
+    
+    /**
+     * Get all comments
+     */
+    getAllComments() {
+        return Object.fromEntries(this.comments);
     }
 }
 

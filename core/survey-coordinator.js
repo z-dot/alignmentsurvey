@@ -406,6 +406,26 @@ class SurveyCoordinator {
             <p class="comment-prompt">${commentConfig.prompt}</p>
             <textarea class="comment-textarea" placeholder="Share your thoughts..." rows="4"></textarea>
         `;
+        
+        // Get textarea and wire up event handlers
+        const textarea = commentCard.querySelector('.comment-textarea');
+        
+        // Load existing comment for this step
+        const existingComment = this.surveyState.getComment();
+        if (existingComment) {
+            textarea.value = existingComment;
+        }
+        
+        // Save comment as user types (debounced)
+        let saveTimeout;
+        textarea.addEventListener('input', () => {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                this.surveyState.setComment(textarea.value);
+                console.log('💬 Comment saved for step:', this.surveyState.getCurrentItem().type);
+            }, 500); // 500ms debounce
+        });
+        
         this.currentCardsContainer.appendChild(commentCard);
     }
     
@@ -647,6 +667,21 @@ class SurveyCoordinator {
     // === DATA EXPORT ===
     
     /**
+     * Generate simple hash of survey config for version checking
+     */
+    getSurveyConfigHash() {
+        // Create a deterministic string from survey config
+        const configString = JSON.stringify(SURVEY_CONFIG, null, 0);
+        
+        // Simple hash function (djb2)
+        let hash = 5381;
+        for (let i = 0; i < configString.length; i++) {
+            hash = ((hash << 5) + hash) + configString.charCodeAt(i);
+        }
+        return (hash >>> 0).toString(16); // Convert to unsigned hex
+    }
+
+    /**
      * Copy survey data to clipboard
      */
     async copyDataToClipboard() {
@@ -662,6 +697,11 @@ class SurveyCoordinator {
         const exportData = {
             surveyProgress: this.surveyState.getProgress(),
             tables: allTables,
+            comments: this.surveyState.getAllComments(),
+            surveyVersion: {
+                hash: this.getSurveyConfigHash(),
+                timestamp: new Date().toISOString()
+            },
             timestamp: new Date().toISOString()
         };
         
